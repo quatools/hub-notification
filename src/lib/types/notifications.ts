@@ -1,5 +1,6 @@
 // ============================================
 // Types TypeScript - Hub Notification
+// Version 2.0 (workflow-based architecture)
 // ============================================
 
 // --- Events ---
@@ -44,29 +45,53 @@ export interface EmailConfig {
   email: string
 }
 
-// --- Preferences ---
-export interface NotificationPreference {
+// --- Workflows ---
+export interface Workflow {
   id: string
-  user_id: string
-  org_id: string | null
+  org_id: string
   event_id: string
   channel_id: string
   is_active: boolean
+  created_by: string
   created_at: string
   updated_at: string
 }
 
-// --- Logs ---
-export type LogStatus = 'pending' | 'sent' | 'failed'
+export type StepType = 'send' | 'wait' | 'condition'
 
-export interface NotificationLog {
+export interface WorkflowStep {
   id: string
+  workflow_id: string
+  step_order: number
+  step_type: StepType
+  subject: string | null
+  body: string
+  format: 'text' | 'html' | 'markdown'
+  step_config: Record<string, unknown> | null
+  created_at: string
+  updated_at: string
+}
+
+// --- User Optouts ---
+export interface UserOptout {
+  id: string
+  user_id: string
+  workflow_id: string
+  created_at: string
+}
+
+// --- Workflow Executions (Logs) ---
+export type ExecutionStatus = 'pending' | 'sent' | 'failed'
+
+export interface WorkflowExecution {
+  id: string
+  workflow_id: string | null
   event_slug: string
-  event_id: string | null
   channel_id: string | null
   user_id: string
   org_id: string | null
-  status: LogStatus
+  status: ExecutionStatus
+  current_step: number
   payload: Record<string, unknown> | null
   rendered_content: Record<string, unknown> | null
   error_message: string | null
@@ -75,19 +100,7 @@ export interface NotificationLog {
   created_at: string
 }
 
-// --- Templates ---
-export interface NotificationTemplate {
-  id: string
-  event_id: string
-  channel_type: string
-  subject: string | null
-  body: string
-  format: 'text' | 'html' | 'markdown'
-  created_at: string
-  updated_at: string
-}
-
-// --- API Request/Response ---
+// --- API Request/Response (serveur-à-serveur) ---
 export interface RegisterRequest {
   app: string
   events: Array<{
@@ -118,21 +131,54 @@ export interface EmitRequest {
 export interface EmitResponse {
   dispatched: number
   channels: string[]
-  log_ids: string[]
+  execution_ids: string[]
 }
 
-// --- API Preferences (format pour le frontend) ---
-export interface PreferenceChannelState {
-  channel_id: string
-  channel_type: ChannelType
-  channel_label: string | null
-  is_active: boolean
-}
+// --- API Admin (format pour le frontend admin) ---
 
-export interface PreferenceEventRow {
+// Workflow avec ses relations (pour l'UI admin)
+export interface WorkflowWithDetails {
+  id: string
+  org_id: string
   event_id: string
-  event_slug: string
+  channel_id: string
+  is_active: boolean
+  created_by: string
+  created_at: string
+  // Relations jointes
+  event: {
+    slug: string
+    label: string
+    description: string | null
+    category: string
+    supported_channels: string[]
+    audiences: string[]
+    payload_schema: Record<string, string> | null
+  }
+  channel: {
+    type: ChannelType
+    label: string | null
+  }
+  step: {
+    id: string
+    subject: string | null
+    body: string
+    format: 'text' | 'html' | 'markdown'
+  }
+}
+
+// Événement avec ses workflows groupés (pour la page workflows admin)
+export interface EventWithWorkflows {
+  event: NotificationEvent
+  workflows: WorkflowWithDetails[]
+}
+
+// --- API User (format pour le frontend membre) ---
+export interface UserWorkflowOptout {
+  workflow_id: string
   event_label: string
   event_category: string
-  channels: PreferenceChannelState[]
+  channel_type: ChannelType
+  channel_label: string | null
+  is_opted_out: boolean
 }

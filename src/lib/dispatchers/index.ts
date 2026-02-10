@@ -1,4 +1,4 @@
-import type { NotificationEvent, NotificationTemplate } from '@/lib/types/notifications'
+import type { NotificationEvent } from '@/lib/types/notifications'
 import { dispatchDiscordWebhook } from './discord-webhook'
 import { dispatchEmail } from './email'
 
@@ -11,7 +11,11 @@ export interface DispatchParams {
   config: Record<string, unknown>
   event: NotificationEvent
   payload: Record<string, unknown>
-  template: NotificationTemplate | null
+  step: {
+    subject: string | null
+    body: string
+    format: 'text' | 'html' | 'markdown'
+  }
 }
 
 type DispatchFn = (params: DispatchParams) => Promise<DispatchResult>

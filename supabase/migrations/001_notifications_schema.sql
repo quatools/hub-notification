@@ -1,6 +1,7 @@
 -- ============================================
 -- Quatools Hub Notification - Schema SQL
 -- Schéma: notifications
+-- Version: 2.0 (workflow-based architecture)
 -- ============================================
 
 -- 1. Créer le schéma
@@ -18,6 +19,7 @@ $$ LANGUAGE plpgsql;
 -- ============================================
 -- TABLE: notifications.events
 -- Catalogue des événements déclarés par les apps
+-- Inchangé par rapport à v1
 -- ============================================
 CREATE TABLE IF NOT EXISTS notifications.events (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -46,7 +48,9 @@ CREATE OR REPLACE TRIGGER trg_events_updated_at
 
 -- ============================================
 -- TABLE: notifications.channels
--- Canaux de notification configurés par les users
+-- Canaux de notification (org-level ou perso)
+-- org_id NOT NULL = canal d'organisation (géré par admin)
+-- org_id IS NULL  = canal personnel (géré par le membre)
 -- ============================================
 CREATE TABLE IF NOT EXISTS notifications.channels (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -62,6 +66,7 @@ CREATE TABLE IF NOT EXISTS notifications.channels (
 );
 
 CREATE INDEX IF NOT EXISTS idx_channels_user_id ON notifications.channels(user_id);
+CREATE INDEX IF NOT EXISTS idx_channels_org_id ON notifications.channels(org_id);
 CREATE INDEX IF NOT EXISTS idx_channels_user_org ON notifications.channels(user_id, org_id);
 
 CREATE OR REPLACE TRIGGER trg_channels_updated_at
@@ -69,95 +74,127 @@ CREATE OR REPLACE TRIGGER trg_channels_updated_at
   FOR EACH ROW EXECUTE FUNCTION notifications.set_updated_at();
 
 -- ============================================
--- TABLE: notifications.preferences
--- Table de routage user × event × channel
+-- TABLE: notifications.workflows
+-- Routes de notification configurées par l'admin
+-- Un workflow = événement + canal + activation
+-- L'admin peut créer N workflows par événement
 -- ============================================
-CREATE TABLE IF NOT EXISTS notifications.preferences (
+CREATE TABLE IF NOT EXISTS notifications.workflows (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id     UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  org_id      UUID,
+  org_id      UUID NOT NULL,
   event_id    UUID NOT NULL REFERENCES notifications.events(id) ON DELETE CASCADE,
   channel_id  UUID NOT NULL REFERENCES notifications.channels(id) ON DELETE CASCADE,
-  is_active   BOOLEAN DEFAULT false,
+  is_active   BOOLEAN DEFAULT true,
+  created_by  UUID NOT NULL REFERENCES auth.users(id),
   created_at  TIMESTAMPTZ DEFAULT now(),
-  updated_at  TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(user_id, org_id, event_id, channel_id)
+  updated_at  TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_preferences_user_org ON notifications.preferences(user_id, org_id);
-CREATE INDEX IF NOT EXISTS idx_preferences_event ON notifications.preferences(event_id);
+CREATE INDEX IF NOT EXISTS idx_workflows_org_event ON notifications.workflows(org_id, event_id);
+CREATE INDEX IF NOT EXISTS idx_workflows_channel ON notifications.workflows(channel_id);
+CREATE INDEX IF NOT EXISTS idx_workflows_org_active ON notifications.workflows(org_id) WHERE is_active = true;
 
-CREATE OR REPLACE TRIGGER trg_preferences_updated_at
-  BEFORE UPDATE ON notifications.preferences
+CREATE OR REPLACE TRIGGER trg_workflows_updated_at
+  BEFORE UPDATE ON notifications.workflows
   FOR EACH ROW EXECUTE FUNCTION notifications.set_updated_at();
 
 -- ============================================
--- TABLE: notifications.logs
--- Historique des notifications envoyées
+-- TABLE: notifications.workflow_steps
+-- Étapes d'un workflow
+-- Palier 1 : toujours 1 step de type "send"
+-- Futur n8n : "wait", "condition", "branch", etc.
 -- ============================================
-CREATE TABLE IF NOT EXISTS notifications.logs (
-  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  event_slug        TEXT NOT NULL,
-  event_id          UUID REFERENCES notifications.events(id) ON DELETE SET NULL,
-  channel_id        UUID REFERENCES notifications.channels(id) ON DELETE SET NULL,
-  user_id           UUID NOT NULL,
-  org_id            UUID,
-  status            TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed')),
-  payload           JSONB,
-  rendered_content  JSONB,
-  error_message     TEXT,
-  attempts          INT DEFAULT 0,
-  sent_at           TIMESTAMPTZ,
-  created_at        TIMESTAMPTZ DEFAULT now()
+CREATE TABLE IF NOT EXISTS notifications.workflow_steps (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workflow_id   UUID NOT NULL REFERENCES notifications.workflows(id) ON DELETE CASCADE,
+  step_order    INT NOT NULL DEFAULT 1,
+  step_type     TEXT NOT NULL DEFAULT 'send' CHECK (step_type IN ('send', 'wait', 'condition')),
+  -- Config pour step "send"
+  subject       TEXT,
+  body          TEXT NOT NULL,
+  format        TEXT DEFAULT 'text' CHECK (format IN ('text', 'html', 'markdown')),
+  -- Config future (n8n)
+  step_config   JSONB,
+  created_at    TIMESTAMPTZ DEFAULT now(),
+  updated_at    TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_logs_user_created ON notifications.logs(user_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_logs_status ON notifications.logs(status);
-CREATE INDEX IF NOT EXISTS idx_logs_event_slug ON notifications.logs(event_slug);
+CREATE INDEX IF NOT EXISTS idx_workflow_steps_workflow ON notifications.workflow_steps(workflow_id);
 
--- ============================================
--- TABLE: notifications.templates
--- Templates de messages par event × channel_type
--- ============================================
-CREATE TABLE IF NOT EXISTS notifications.templates (
-  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  event_id     UUID NOT NULL REFERENCES notifications.events(id) ON DELETE CASCADE,
-  channel_type TEXT NOT NULL,
-  subject      TEXT,
-  body         TEXT NOT NULL,
-  format       TEXT DEFAULT 'text' CHECK (format IN ('text', 'html', 'markdown')),
-  created_at   TIMESTAMPTZ DEFAULT now(),
-  updated_at   TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(event_id, channel_type)
-);
-
-CREATE OR REPLACE TRIGGER trg_templates_updated_at
-  BEFORE UPDATE ON notifications.templates
+CREATE OR REPLACE TRIGGER trg_workflow_steps_updated_at
+  BEFORE UPDATE ON notifications.workflow_steps
   FOR EACH ROW EXECUTE FUNCTION notifications.set_updated_at();
+
+-- ============================================
+-- TABLE: notifications.user_optouts
+-- Opt-out des membres sur des workflows spécifiques
+-- ============================================
+CREATE TABLE IF NOT EXISTS notifications.user_optouts (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  workflow_id UUID NOT NULL REFERENCES notifications.workflows(id) ON DELETE CASCADE,
+  created_at  TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, workflow_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_optouts_user ON notifications.user_optouts(user_id);
+
+-- ============================================
+-- TABLE: notifications.workflow_executions
+-- Logs d'exécution des workflows
+-- ============================================
+CREATE TABLE IF NOT EXISTS notifications.workflow_executions (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workflow_id     UUID REFERENCES notifications.workflows(id) ON DELETE SET NULL,
+  event_slug      TEXT NOT NULL,
+  channel_id      UUID REFERENCES notifications.channels(id) ON DELETE SET NULL,
+  user_id         UUID NOT NULL,
+  org_id          UUID,
+  status          TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed')),
+  current_step    INT DEFAULT 1,
+  payload         JSONB,
+  rendered_content JSONB,
+  error_message   TEXT,
+  attempts        INT DEFAULT 0,
+  sent_at         TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_executions_org_created ON notifications.workflow_executions(org_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_executions_user_created ON notifications.workflow_executions(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_executions_workflow ON notifications.workflow_executions(workflow_id);
+CREATE INDEX IF NOT EXISTS idx_executions_status ON notifications.workflow_executions(status);
+CREATE INDEX IF NOT EXISTS idx_executions_event_slug ON notifications.workflow_executions(event_slug);
 
 -- ============================================
 -- RLS (Row Level Security)
 -- ============================================
 
--- Activer RLS sur toutes les tables
 ALTER TABLE notifications.events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications.channels ENABLE ROW LEVEL SECURITY;
-ALTER TABLE notifications.preferences ENABLE ROW LEVEL SECURITY;
-ALTER TABLE notifications.logs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE notifications.templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications.workflows ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications.workflow_steps ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications.user_optouts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications.workflow_executions ENABLE ROW LEVEL SECURITY;
 
 -- --- EVENTS ---
--- Lecture pour les users authentifiés (catalogue public)
+-- Lecture pour tous les users authentifiés (catalogue public)
 CREATE POLICY "events_select_authenticated"
   ON notifications.events FOR SELECT
   TO authenticated
   USING (true);
 
 -- --- CHANNELS ---
-CREATE POLICY "channels_select_own"
+-- Un user voit ses propres canaux + les canaux de son org
+-- Note: la vérification d'appartenance à l'org se fait côté API (service_role)
+-- Pour la RLS on permet de voir ses propres canaux et les canaux des orgs
+CREATE POLICY "channels_select_own_or_org"
   ON notifications.channels FOR SELECT
   TO authenticated
-  USING (auth.uid() = user_id);
+  USING (
+    auth.uid() = user_id
+    OR org_id IS NOT NULL  -- Les canaux d'org sont visibles par les membres (filtré côté API)
+  );
 
 CREATE POLICY "channels_insert_own"
   ON notifications.channels FOR INSERT
@@ -175,39 +212,44 @@ CREATE POLICY "channels_delete_own"
   TO authenticated
   USING (auth.uid() = user_id);
 
--- --- PREFERENCES ---
-CREATE POLICY "preferences_select_own"
-  ON notifications.preferences FOR SELECT
-  TO authenticated
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "preferences_insert_own"
-  ON notifications.preferences FOR INSERT
-  TO authenticated
-  WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "preferences_update_own"
-  ON notifications.preferences FOR UPDATE
-  TO authenticated
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "preferences_delete_own"
-  ON notifications.preferences FOR DELETE
-  TO authenticated
-  USING (auth.uid() = user_id);
-
--- --- LOGS ---
-CREATE POLICY "logs_select_own"
-  ON notifications.logs FOR SELECT
-  TO authenticated
-  USING (auth.uid() = user_id);
-
--- --- TEMPLATES ---
-CREATE POLICY "templates_select_authenticated"
-  ON notifications.templates FOR SELECT
+-- --- WORKFLOWS ---
+-- Lecture par tous les authentifiés (filtré par org côté API)
+-- Écriture via service_role uniquement (les API admin utilisent service_role)
+CREATE POLICY "workflows_select_authenticated"
+  ON notifications.workflows FOR SELECT
   TO authenticated
   USING (true);
+
+-- --- WORKFLOW_STEPS ---
+-- Même logique que workflows
+CREATE POLICY "workflow_steps_select_authenticated"
+  ON notifications.workflow_steps FOR SELECT
+  TO authenticated
+  USING (true);
+
+-- --- USER_OPTOUTS ---
+-- CRUD par le propriétaire uniquement
+CREATE POLICY "optouts_select_own"
+  ON notifications.user_optouts FOR SELECT
+  TO authenticated
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "optouts_insert_own"
+  ON notifications.user_optouts FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "optouts_delete_own"
+  ON notifications.user_optouts FOR DELETE
+  TO authenticated
+  USING (auth.uid() = user_id);
+
+-- --- WORKFLOW_EXECUTIONS ---
+-- Un user voit ses propres logs
+CREATE POLICY "executions_select_own"
+  ON notifications.workflow_executions FOR SELECT
+  TO authenticated
+  USING (auth.uid() = user_id);
 
 -- ============================================
 -- Permissions : exposer le schéma à PostgREST/Supabase
@@ -216,4 +258,4 @@ GRANT USAGE ON SCHEMA notifications TO anon, authenticated, service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA notifications TO service_role;
 GRANT SELECT ON ALL TABLES IN SCHEMA notifications TO authenticated;
 GRANT INSERT, UPDATE, DELETE ON notifications.channels TO authenticated;
-GRANT INSERT, UPDATE, DELETE ON notifications.preferences TO authenticated;
+GRANT INSERT, DELETE ON notifications.user_optouts TO authenticated;

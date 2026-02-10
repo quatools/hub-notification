@@ -52,29 +52,29 @@ export async function POST(request: NextRequest) {
 
   const notifEvent = event as NotificationEvent
 
-  // 5. Résoudre les routes (users × channels × templates)
+  // 5. Résoudre les routes via les workflows
   const routes = await resolveRoutes(notifEvent, body.org_id, body.target_users)
 
   if (routes.length === 0) {
     return NextResponse.json({
       dispatched: 0,
       channels: [],
-      log_ids: [],
+      execution_ids: [],
     } satisfies EmitResponse)
   }
 
-  // 6. Dispatcher en parallèle avec logging
-  const logIds: string[] = []
+  // 6. Dispatcher en parallèle avec logging dans workflow_executions
+  const executionIds: string[] = []
   const channelTypes = new Set<string>()
 
   const dispatchPromises = routes.map(async (route) => {
-    // Créer le log (status pending)
-    const { data: log, error: logError } = await supabase
+    // Créer l'exécution (status pending)
+    const { data: execution, error: execError } = await supabase
       .schema('notifications')
-      .from('logs')
+      .from('workflow_executions')
       .insert({
+        workflow_id: route.workflow_id,
         event_slug: body.event,
-        event_id: notifEvent.id,
         channel_id: route.channel_id,
         user_id: route.user_id,
         org_id: body.org_id,
@@ -84,12 +84,12 @@ export async function POST(request: NextRequest) {
       .select('id')
       .single()
 
-    if (logError || !log) {
-      console.error('Erreur création log:', logError)
+    if (execError || !execution) {
+      console.error('Erreur création execution:', execError)
       return
     }
 
-    logIds.push(log.id)
+    executionIds.push(execution.id)
     channelTypes.add(route.channel_type)
 
     // Dispatcher
@@ -97,12 +97,12 @@ export async function POST(request: NextRequest) {
     if (!dispatcher) {
       await supabase
         .schema('notifications')
-        .from('logs')
+        .from('workflow_executions')
         .update({
           status: 'failed',
           error_message: `Dispatcher non trouvé pour le type: ${route.channel_type}`,
         })
-        .eq('id', log.id)
+        .eq('id', execution.id)
       return
     }
 
@@ -110,29 +110,29 @@ export async function POST(request: NextRequest) {
       config: route.channel_config,
       event: notifEvent,
       payload: body.payload,
-      template: route.template,
+      step: route.step,
     })
 
-    // Mettre à jour le log
+    // Mettre à jour l'exécution
     await supabase
       .schema('notifications')
-      .from('logs')
+      .from('workflow_executions')
       .update({
         status: result.success ? 'sent' : 'failed',
         error_message: result.error || null,
         sent_at: result.success ? new Date().toISOString() : null,
         attempts: 1,
       })
-      .eq('id', log.id)
+      .eq('id', execution.id)
   })
 
   // Attendre tous les dispatches (un échec n'empêche pas les autres)
   await Promise.allSettled(dispatchPromises)
 
   const response: EmitResponse = {
-    dispatched: logIds.length,
+    dispatched: executionIds.length,
     channels: Array.from(channelTypes),
-    log_ids: logIds,
+    execution_ids: executionIds,
   }
 
   return NextResponse.json(response)

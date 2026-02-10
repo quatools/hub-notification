@@ -14,7 +14,7 @@ function getCategoryColor(category: string): number {
 }
 
 export async function dispatchDiscordWebhook(params: DispatchParams): Promise<DispatchResult> {
-  const { config, event, payload, template } = params
+  const { config, event, payload, step } = params
 
   const webhookUrl = config.webhook_url as string
   if (!webhookUrl) {
@@ -29,9 +29,9 @@ export async function dispatchDiscordWebhook(params: DispatchParams): Promise<Di
     return { success: false, error: 'URL webhook Discord invalide' }
   }
 
-  // Construire la description
-  const description = template?.body
-    ? renderTemplate(template.body, payload)
+  // Construire la description depuis le step template
+  const description = step.body
+    ? renderTemplate(step.body, payload)
     : `Événement: ${event.label}`
 
   // Construire l'embed

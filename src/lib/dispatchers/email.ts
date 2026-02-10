@@ -13,21 +13,21 @@ function getResendClient(): Resend {
 }
 
 export async function dispatchEmail(params: DispatchParams): Promise<DispatchResult> {
-  const { config, event, payload, template } = params
+  const { config, event, payload, step } = params
 
   const email = config.email as string
   if (!email) {
     return { success: false, error: 'email manquant dans la config du canal' }
   }
 
-  // Construire le sujet
-  const subject = template?.subject
-    ? renderTemplate(template.subject, payload)
+  // Construire le sujet depuis le step
+  const subject = step.subject
+    ? renderTemplate(step.subject, payload)
     : event.label
 
-  // Construire le corps
-  const bodyContent = template?.body
-    ? renderTemplate(template.body, payload)
+  // Construire le corps depuis le step
+  const bodyContent = step.body
+    ? renderTemplate(step.body, payload)
     : `<p>${event.label}</p><p>${event.description || ''}</p>`
 
   const html = wrapEmailLayout(bodyContent, event.label)
