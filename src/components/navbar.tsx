@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Bell, LayoutDashboard, Radio, Workflow, ScrollText } from "lucide-react"
+import { Bell, LayoutDashboard, Radio, Workflow, ScrollText, BellOff, Mail } from "lucide-react"
 
 export function Navbar() {
   const pathname = usePathname()
@@ -12,6 +12,7 @@ export function Navbar() {
   const orgParam = orgId ? `?org_id=${orgId}` : ""
 
   const isAdmin = pathname.startsWith("/admin")
+  const isUser = pathname.startsWith("/preferences")
 
   const adminItems = [
     { href: `/admin${orgParam}`, label: "Dashboard", icon: LayoutDashboard, exact: true },
@@ -20,7 +21,12 @@ export function Navbar() {
     { href: `/admin/logs${orgParam}`, label: "Historique", icon: ScrollText },
   ]
 
-  const navItems = isAdmin ? adminItems : []
+  const userItems = [
+    { href: `/preferences${orgParam}`, label: "Mes notifications", icon: BellOff, exact: true },
+    { href: `/preferences/channels${orgParam}`, label: "Mes canaux", icon: Mail },
+  ]
+
+  const navItems = isAdmin ? adminItems : isUser ? userItems : []
 
   return (
     <header className="border-b">
