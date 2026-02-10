@@ -7,13 +7,8 @@ interface AdminAuthResult {
 }
 
 /**
- * Vérifie que l'utilisateur est authentifié et admin de l'organisation.
- * Retourne { user_id, org_id } ou null si non autorisé.
- *
- * TODO: Quand le schéma BAAS sera connu, vérifier le rôle admin via
- * la table d'appartenance à l'org (ex: public.org_members).
- * Pour l'instant, on vérifie simplement que l'utilisateur est authentifié
- * et que l'org_id est fourni.
+ * Vérifie que l'utilisateur est authentifié et admin du club (org).
+ * Vérifie dans la table public.club_admins du BAAS.
  */
 export async function getAdminAuth(orgId: string | null): Promise<AdminAuthResult | null> {
   if (!orgId) return null
@@ -21,15 +16,16 @@ export async function getAdminAuth(orgId: string | null): Promise<AdminAuthResul
   const user = await getAuthenticatedUser()
   if (!user) return null
 
-  // TODO: Vérifier le rôle admin dans la table BAAS
-  // Exemple futur :
-  // const { data } = await supabase
-  //   .from('org_members')
-  //   .select('role')
-  //   .eq('user_id', user.id)
-  //   .eq('org_id', orgId)
-  //   .single()
-  // if (!data || data.role !== 'admin') return null
+  const supabase = createServiceClient()
+  const { data: admin } = await supabase
+    .from('club_admins')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('club_id', orgId)
+    .eq('is_active', true)
+    .single()
+
+  if (!admin) return null
 
   return {
     user_id: user.id,
@@ -38,8 +34,25 @@ export async function getAdminAuth(orgId: string | null): Promise<AdminAuthResul
 }
 
 /**
- * Vérifie que l'utilisateur est admin de l'org propriétaire d'une ressource.
- * Utile pour PUT/DELETE où on a l'ID de la ressource mais pas l'org_id directement.
+ * Retourne la liste des clubs dont l'utilisateur est admin.
+ */
+export async function getUserClubs(userId: string): Promise<Array<{
+  club_id: string
+  club_name: string
+  club_slug: string
+  role: string
+}>> {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase.rpc('get_user_clubs', {
+    user_uuid: userId,
+  })
+
+  if (error || !data) return []
+  return data
+}
+
+/**
+ * Vérifie que l'utilisateur est admin de l'org propriétaire d'un canal.
  */
 export async function getAdminAuthForChannel(channelId: string): Promise<AdminAuthResult | null> {
   const user = await getAuthenticatedUser()

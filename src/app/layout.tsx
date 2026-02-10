@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { Navbar } from "@/components/navbar";
+import { ClubProvider } from "@/lib/contexts/club-context";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -30,12 +30,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Suspense>
+        <ClubProvider>
           <Navbar />
-        </Suspense>
-        <main className="container mx-auto px-4 py-8 max-w-5xl">
-          {children}
-        </main>
+          <main className="container mx-auto px-4 py-8 max-w-5xl">
+            {children}
+          </main>
+        </ClubProvider>
         <Toaster />
       </body>
     </html>

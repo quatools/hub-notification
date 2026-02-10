@@ -1,7 +1,6 @@
 "use client"
 
-import { useSearchParams } from "next/navigation"
-import { useEffect, useState, useCallback, Suspense } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,8 +8,9 @@ import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { useClub } from "@/lib/contexts/club-context"
 import { toast } from "sonner"
-import { Plus, Mail, Trash2, Loader2 } from "lucide-react"
+import { Plus, Mail, Trash2, Loader2, LogIn } from "lucide-react"
 
 interface UserChannel {
   id: string
@@ -21,8 +21,7 @@ interface UserChannel {
 }
 
 function UserChannelsContent() {
-  const searchParams = useSearchParams()
-  const orgId = searchParams.get("org_id")
+  const { loading: clubLoading, isAuthenticated } = useClub()
   const [channels, setChannels] = useState<UserChannel[]>([])
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
@@ -86,14 +85,16 @@ function UserChannelsContent() {
     }
   }
 
-  if (!orgId) {
+  if (clubLoading) {
+    return <div className="space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-24" /></div>
+  }
+
+  if (!isAuthenticated) {
     return (
       <div className="text-center py-12">
-        <Mail className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Mes canaux</h2>
-        <p className="text-muted-foreground">
-          Accédez à cette page depuis votre application avec le paramètre <code>org_id</code>.
-        </p>
+        <LogIn className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Connexion requise</h2>
+        <p className="text-muted-foreground">Connectez-vous pour gérer vos canaux.</p>
       </div>
     )
   }
@@ -218,9 +219,5 @@ function UserChannelsContent() {
 }
 
 export default function UserChannelsPage() {
-  return (
-    <Suspense fallback={<Skeleton className="h-96 w-full" />}>
-      <UserChannelsContent />
-    </Suspense>
-  )
+  return <UserChannelsContent />
 }

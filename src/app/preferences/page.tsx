@@ -1,13 +1,13 @@
 "use client"
 
-import { useSearchParams } from "next/navigation"
-import { useEffect, useState, useCallback, Suspense, useMemo } from "react"
+import { useEffect, useState, useCallback, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useClub } from "@/lib/contexts/club-context"
 import { toast } from "sonner"
-import { Radio, Mail, BellOff, Info } from "lucide-react"
+import { Radio, Mail, BellOff, Info, LogIn } from "lucide-react"
 
 interface WorkflowOptout {
   workflow_id: string
@@ -19,8 +19,8 @@ interface WorkflowOptout {
 }
 
 function PreferencesContent() {
-  const searchParams = useSearchParams()
-  const orgId = searchParams.get("org_id")
+  const { selectedClub, loading: clubLoading, isAuthenticated } = useClub()
+  const orgId = selectedClub?.club_id || null
   const [workflows, setWorkflows] = useState<WorkflowOptout[]>([])
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState<string | null>(null)
@@ -87,14 +87,26 @@ function PreferencesContent() {
     return Array.from(map.entries())
   }, [workflows])
 
-  if (!orgId) {
+  if (clubLoading) {
+    return <div className="space-y-4"><Skeleton className="h-8 w-64" /><Skeleton className="h-24" /><Skeleton className="h-24" /></div>
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="text-center py-12">
+        <LogIn className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Connexion requise</h2>
+        <p className="text-muted-foreground">Connectez-vous pour gérer vos notifications.</p>
+      </div>
+    )
+  }
+
+  if (!selectedClub) {
     return (
       <div className="text-center py-12">
         <BellOff className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Mes notifications</h2>
-        <p className="text-muted-foreground">
-          Accédez à cette page depuis votre application avec le paramètre <code>org_id</code>.
-        </p>
+        <h2 className="text-xl font-semibold mb-2">Sélectionnez un club</h2>
+        <p className="text-muted-foreground">Choisissez un club dans le menu en haut de page.</p>
       </div>
     )
   }
@@ -180,9 +192,5 @@ function PreferencesContent() {
 }
 
 export default function PreferencesPage() {
-  return (
-    <Suspense fallback={<Skeleton className="h-96 w-full" />}>
-      <PreferencesContent />
-    </Suspense>
-  )
+  return <PreferencesContent />
 }

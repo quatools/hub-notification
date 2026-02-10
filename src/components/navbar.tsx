@@ -1,45 +1,68 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname, useSearchParams } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { useClub } from "@/lib/contexts/club-context"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Bell, LayoutDashboard, Radio, Workflow, ScrollText, BellOff, Mail } from "lucide-react"
 
 export function Navbar() {
   const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const orgId = searchParams.get("org_id")
-  const orgParam = orgId ? `?org_id=${orgId}` : ""
+  const { clubs, selectedClub, selectClub, loading } = useClub()
 
   const isAdmin = pathname.startsWith("/admin")
   const isUser = pathname.startsWith("/preferences")
 
   const adminItems = [
-    { href: `/admin${orgParam}`, label: "Dashboard", icon: LayoutDashboard, exact: true },
-    { href: `/admin/channels${orgParam}`, label: "Canaux", icon: Radio },
-    { href: `/admin/workflows${orgParam}`, label: "Workflows", icon: Workflow },
-    { href: `/admin/logs${orgParam}`, label: "Historique", icon: ScrollText },
+    { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
+    { href: "/admin/channels", label: "Canaux", icon: Radio },
+    { href: "/admin/workflows", label: "Workflows", icon: Workflow },
+    { href: "/admin/logs", label: "Historique", icon: ScrollText },
   ]
 
   const userItems = [
-    { href: `/preferences${orgParam}`, label: "Mes notifications", icon: BellOff, exact: true },
-    { href: `/preferences/channels${orgParam}`, label: "Mes canaux", icon: Mail },
+    { href: "/preferences", label: "Mes notifications", icon: BellOff, exact: true },
+    { href: "/preferences/channels", label: "Mes canaux", icon: Mail },
   ]
 
   const navItems = isAdmin ? adminItems : isUser ? userItems : []
 
   return (
     <header className="border-b">
-      <div className="container mx-auto px-4 max-w-5xl flex items-center h-14 gap-6">
-        <Link href={`/${orgParam}`} className="flex items-center gap-2 font-semibold">
+      <div className="container mx-auto px-4 max-w-5xl flex items-center h-14 gap-4">
+        <Link href="/" className="flex items-center gap-2 font-semibold">
           <Bell className="h-5 w-5" />
-          <span>Quatools Notifications</span>
+          <span className="hidden sm:inline">Quatools Notifications</span>
         </Link>
-        <nav className="flex items-center gap-1">
+
+        {/* Club selector */}
+        {!loading && clubs.length > 1 && (
+          <Select value={selectedClub?.club_id || ""} onValueChange={selectClub}>
+            <SelectTrigger className="w-[180px] h-8 text-sm">
+              <SelectValue placeholder="Choisir un club" />
+            </SelectTrigger>
+            <SelectContent>
+              {clubs.map((club) => (
+                <SelectItem key={club.club_id} value={club.club_id}>
+                  {club.club_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {!loading && clubs.length === 1 && selectedClub && (
+          <span className="text-sm text-muted-foreground border rounded-md px-2 py-1">
+            {selectedClub.club_name}
+          </span>
+        )}
+
+        <nav className="flex items-center gap-1 ml-auto">
           {navItems.map((item) => {
             const isActive = 'exact' in item && item.exact
-              ? pathname === "/admin"
-              : pathname.startsWith(item.href.split("?")[0])
+              ? pathname === item.href
+              : pathname.startsWith(item.href)
             return (
               <Link
                 key={item.href}
@@ -52,7 +75,7 @@ export function Navbar() {
                 )}
               >
                 <item.icon className="h-4 w-4" />
-                {item.label}
+                <span className="hidden sm:inline">{item.label}</span>
               </Link>
             )
           })}

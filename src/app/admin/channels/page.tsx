@@ -1,7 +1,6 @@
 "use client"
 
-import { useSearchParams } from "next/navigation"
-import { useEffect, useState, useCallback, Suspense } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -12,6 +11,7 @@ import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { useClub } from "@/lib/contexts/club-context"
 import { toast } from "sonner"
 import { Plus, Radio, Mail, Trash2, CheckCircle, XCircle, Loader2 } from "lucide-react"
 
@@ -25,9 +25,9 @@ interface Channel {
   created_at: string
 }
 
-function ChannelsContent() {
-  const searchParams = useSearchParams()
-  const orgId = searchParams.get("org_id")
+export default function AdminChannelsPage() {
+  const { selectedClub, loading: clubLoading } = useClub()
+  const orgId = selectedClub?.club_id
   const [channels, setChannels] = useState<Channel[]>([])
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
@@ -51,7 +51,7 @@ function ChannelsContent() {
     }
   }, [orgId])
 
-  useEffect(() => { fetchChannels() }, [fetchChannels])
+  useEffect(() => { setLoading(true); fetchChannels() }, [fetchChannels])
 
   const handleCreate = async () => {
     if (!orgId) return
@@ -64,12 +64,7 @@ function ChannelsContent() {
       const res = await fetch("/api/admin/channels", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          org_id: orgId,
-          type: newType,
-          label: newLabel || undefined,
-          config,
-        }),
+        body: JSON.stringify({ org_id: orgId, type: newType, label: newLabel || undefined, config }),
       })
 
       if (!res.ok) {
@@ -144,24 +139,16 @@ function ChannelsContent() {
       const url = channel.config.webhook_url as string
       return url ? `...${url.slice(-20)}` : ""
     }
-    if (channel.type === "email") {
-      return channel.config.email as string || ""
-    }
+    if (channel.type === "email") return channel.config.email as string || ""
     return ""
   }
 
-  if (!orgId) {
-    return <p className="text-center text-muted-foreground py-12">Paramètre org_id manquant.</p>
+  if (clubLoading || !selectedClub) {
+    return <div className="space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-24" /><Skeleton className="h-24" /></div>
   }
 
   if (loading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-24" />
-        <Skeleton className="h-24" />
-      </div>
-    )
+    return <div className="space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-24" /><Skeleton className="h-24" /></div>
   }
 
   return (
@@ -173,9 +160,7 @@ function ChannelsContent() {
             <Button><Plus className="h-4 w-4 mr-2" />Ajouter un canal</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Nouveau canal</DialogTitle>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>Nouveau canal</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label>Type</Label>
@@ -189,46 +174,25 @@ function ChannelsContent() {
               </div>
               <div className="space-y-2">
                 <Label>Label (optionnel)</Label>
-                <Input
-                  placeholder={newType === "discord_webhook" ? "ex: #notifications" : "ex: Contact club"}
-                  value={newLabel}
-                  onChange={(e) => setNewLabel(e.target.value)}
-                />
+                <Input placeholder={newType === "discord_webhook" ? "ex: #notifications" : "ex: Contact club"} value={newLabel} onChange={(e) => setNewLabel(e.target.value)} />
               </div>
               {newType === "discord_webhook" ? (
                 <div className="space-y-2">
                   <Label>URL du Webhook</Label>
-                  <Input
-                    placeholder="https://discord.com/api/webhooks/..."
-                    value={newWebhookUrl}
-                    onChange={(e) => setNewWebhookUrl(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Paramètres du serveur &gt; Intégrations &gt; Webhooks
-                  </p>
+                  <Input placeholder="https://discord.com/api/webhooks/..." value={newWebhookUrl} onChange={(e) => setNewWebhookUrl(e.target.value)} />
+                  <p className="text-xs text-muted-foreground">Paramètres du serveur &gt; Intégrations &gt; Webhooks</p>
                 </div>
               ) : (
                 <div className="space-y-2">
                   <Label>Adresse email</Label>
-                  <Input
-                    type="email"
-                    placeholder="contact@monclub.fr"
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                  />
+                  <Input type="email" placeholder="contact@monclub.fr" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
                 </div>
               )}
             </div>
             <DialogFooter>
-              <DialogClose asChild>
-                <Button variant="outline">Annuler</Button>
-              </DialogClose>
-              <Button
-                onClick={handleCreate}
-                disabled={creating || (newType === "discord_webhook" ? !newWebhookUrl : !newEmail)}
-              >
-                {creating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Créer
+              <DialogClose asChild><Button variant="outline">Annuler</Button></DialogClose>
+              <Button onClick={handleCreate} disabled={creating || (newType === "discord_webhook" ? !newWebhookUrl : !newEmail)}>
+                {creating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Créer
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -240,12 +204,8 @@ function ChannelsContent() {
           <CardContent className="py-12 text-center">
             <Radio className="h-10 w-10 mx-auto text-muted-foreground mb-4" />
             <h3 className="font-semibold mb-2">Aucun canal configuré</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Ajoutez un webhook Discord ou une adresse email pour commencer à recevoir vos notifications.
-            </p>
-            <Button onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />Ajouter un canal
-            </Button>
+            <p className="text-sm text-muted-foreground mb-4">Ajoutez un webhook Discord ou une adresse email pour commencer.</p>
+            <Button onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4 mr-2" />Ajouter un canal</Button>
           </CardContent>
         </Card>
       ) : (
@@ -257,44 +217,27 @@ function ChannelsContent() {
                   <div className="flex items-center gap-3">
                     {getChannelIcon(channel.type)}
                     <div>
-                      <CardTitle className="text-base">
-                        {channel.label || getChannelTypeLabel(channel.type)}
-                      </CardTitle>
-                      <p className="text-sm text-muted-foreground mt-0.5">
-                        {getChannelTypeLabel(channel.type)} &middot; {getChannelDetail(channel)}
-                      </p>
+                      <CardTitle className="text-base">{channel.label || getChannelTypeLabel(channel.type)}</CardTitle>
+                      <p className="text-sm text-muted-foreground mt-0.5">{getChannelTypeLabel(channel.type)} &middot; {getChannelDetail(channel)}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <Badge variant={channel.is_verified ? "default" : "secondary"} className="text-xs">
-                      {channel.is_verified ? (
-                        <><CheckCircle className="h-3 w-3 mr-1" />Vérifié</>
-                      ) : (
-                        <><XCircle className="h-3 w-3 mr-1" />Non vérifié</>
-                      )}
+                      {channel.is_verified ? <><CheckCircle className="h-3 w-3 mr-1" />Vérifié</> : <><XCircle className="h-3 w-3 mr-1" />Non vérifié</>}
                     </Badge>
-                    <Switch
-                      checked={channel.is_active}
-                      onCheckedChange={() => handleToggle(channel)}
-                    />
+                    <Switch checked={channel.is_active} onCheckedChange={() => handleToggle(channel)} />
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
                           <AlertDialogTitle>Supprimer ce canal ?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Les workflows utilisant ce canal seront également supprimés. Cette action est irréversible.
-                          </AlertDialogDescription>
+                          <AlertDialogDescription>Les workflows utilisant ce canal seront également supprimés. Cette action est irréversible.</AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Annuler</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDelete(channel.id)}>
-                            Supprimer
-                          </AlertDialogAction>
+                          <AlertDialogAction onClick={() => handleDelete(channel.id)}>Supprimer</AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
@@ -306,13 +249,5 @@ function ChannelsContent() {
         </div>
       )}
     </div>
-  )
-}
-
-export default function AdminChannelsPage() {
-  return (
-    <Suspense fallback={<Skeleton className="h-96 w-full" />}>
-      <ChannelsContent />
-    </Suspense>
   )
 }

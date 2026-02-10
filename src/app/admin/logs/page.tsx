@@ -1,7 +1,6 @@
 "use client"
 
-import { useSearchParams } from "next/navigation"
-import { useEffect, useState, useCallback, Suspense } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -9,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useClub } from "@/lib/contexts/club-context"
 import { toast } from "sonner"
 import { ChevronLeft, ChevronRight, CheckCircle, XCircle, Clock, Radio, Mail } from "lucide-react"
 
@@ -31,8 +31,8 @@ interface LogEntry {
 }
 
 function LogsContent() {
-  const searchParams = useSearchParams()
-  const orgId = searchParams.get("org_id")
+  const { selectedClub, loading: clubLoading } = useClub()
+  const orgId = selectedClub?.club_id || null
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -104,8 +104,8 @@ function LogsContent() {
   const totalPages = Math.ceil(total / limit)
   const currentPage = Math.floor(offset / limit) + 1
 
-  if (!orgId) {
-    return <p className="text-center text-muted-foreground py-12">Paramètre org_id manquant.</p>
+  if (clubLoading || !selectedClub) {
+    return <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
   }
 
   return (
@@ -290,9 +290,5 @@ function LogsContent() {
 }
 
 export default function AdminLogsPage() {
-  return (
-    <Suspense fallback={<Skeleton className="h-96 w-full" />}>
-      <LogsContent />
-    </Suspense>
-  )
+  return <LogsContent />
 }

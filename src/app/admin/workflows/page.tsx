@@ -1,7 +1,6 @@
 "use client"
 
-import { useSearchParams } from "next/navigation"
-import { useEffect, useState, useCallback, Suspense, useMemo } from "react"
+import { useEffect, useState, useCallback, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -14,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { useClub } from "@/lib/contexts/club-context"
 import { toast } from "sonner"
 import Link from "next/link"
 import {
@@ -60,9 +60,8 @@ interface EventWithWorkflows {
 }
 
 function WorkflowsContent() {
-  const searchParams = useSearchParams()
-  const orgId = searchParams.get("org_id")
-  const orgParam = orgId ? `?org_id=${orgId}` : ""
+  const { selectedClub, loading: clubLoading } = useClub()
+  const orgId = selectedClub?.club_id || null
   const [eventsWithWorkflows, setEventsWithWorkflows] = useState<EventWithWorkflows[]>([])
   const [channels, setChannels] = useState<Channel[]>([])
   const [loading, setLoading] = useState(true)
@@ -296,8 +295,8 @@ function WorkflowsContent() {
     return channelType === "email" ? "html" : channelType === "discord_webhook" ? "markdown" : "text"
   }
 
-  if (!orgId) {
-    return <p className="text-center text-muted-foreground py-12">Paramètre org_id manquant.</p>
+  if (clubLoading || !selectedClub) {
+    return <div className="space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-32" /><Skeleton className="h-32" /></div>
   }
 
   if (loading) {
@@ -323,7 +322,7 @@ function WorkflowsContent() {
               Vous devez créer au moins un canal (Discord, email) avant de configurer des workflows.
             </p>
             <Button asChild>
-              <Link href={`/admin/channels${orgParam}`}>Configurer un canal</Link>
+              <Link href="/admin/channels">Configurer un canal</Link>
             </Button>
           </CardContent>
         </Card>
@@ -658,9 +657,5 @@ function WorkflowsContent() {
 }
 
 export default function AdminWorkflowsPage() {
-  return (
-    <Suspense fallback={<Skeleton className="h-96 w-full" />}>
-      <WorkflowsContent />
-    </Suspense>
-  )
+  return <WorkflowsContent />
 }

@@ -1,14 +1,14 @@
 "use client"
 
-import { useSearchParams } from "next/navigation"
-import { useEffect, useState, useCallback, Suspense } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useClub } from "@/lib/contexts/club-context"
 import { toast } from "sonner"
 import Link from "next/link"
-import { Radio, Workflow, ScrollText, AlertCircle, CheckCircle, XCircle } from "lucide-react"
+import { Radio, Workflow, ScrollText, AlertCircle, CheckCircle, XCircle, LogIn } from "lucide-react"
 
 interface DashboardData {
   events_count: number
@@ -22,9 +22,9 @@ interface DashboardData {
   }>
 }
 
-function DashboardContent() {
-  const searchParams = useSearchParams()
-  const orgId = searchParams.get("org_id")
+export default function AdminDashboardPage() {
+  const { selectedClub, loading: clubLoading, isAuthenticated, clubs } = useClub()
+  const orgId = selectedClub?.club_id
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -60,15 +60,55 @@ function DashboardContent() {
     }
   }, [orgId])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => {
+    setLoading(true)
+    fetchData()
+  }, [fetchData])
 
-  if (!orgId) {
+  if (clubLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="text-center py-12">
+        <LogIn className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Connexion requise</h2>
+        <p className="text-muted-foreground">
+          Connectez-vous pour accéder à l&apos;espace d&apos;administration.
+        </p>
+      </div>
+    )
+  }
+
+  if (clubs.length === 0) {
     return (
       <div className="text-center py-12">
         <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Espace Administration</h2>
+        <h2 className="text-xl font-semibold mb-2">Aucun club</h2>
         <p className="text-muted-foreground">
-          Accédez à cette page depuis votre application avec le paramètre <code>org_id</code>.
+          Vous n&apos;êtes administrateur d&apos;aucun club. Créez ou rejoignez un club depuis le BAAS.
+        </p>
+      </div>
+    )
+  }
+
+  if (!selectedClub) {
+    return (
+      <div className="text-center py-12">
+        <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Sélectionnez un club</h2>
+        <p className="text-muted-foreground">
+          Choisissez un club dans le menu en haut de page.
         </p>
       </div>
     )
@@ -87,11 +127,9 @@ function DashboardContent() {
     )
   }
 
-  const orgParam = `?org_id=${orgId}`
-
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Dashboard</h1>
+      <h1 className="text-2xl font-bold">Dashboard — {selectedClub.club_name}</h1>
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -108,7 +146,7 @@ function DashboardContent() {
             <div className="text-3xl font-bold">{data?.channels_count || 0}</div>
             {data?.channels_count === 0 && (
               <Button variant="link" className="px-0 text-sm" asChild>
-                <Link href={`/admin/channels${orgParam}`}>Configurer un canal</Link>
+                <Link href="/admin/channels">Configurer un canal</Link>
               </Button>
             )}
           </CardContent>
@@ -174,19 +212,11 @@ function DashboardContent() {
               Ajoutez un webhook Discord ou une adresse email pour recevoir vos notifications.
             </p>
             <Button asChild>
-              <Link href={`/admin/channels${orgParam}`}>Configurer un canal</Link>
+              <Link href="/admin/channels">Configurer un canal</Link>
             </Button>
           </CardContent>
         </Card>
       )}
     </div>
-  )
-}
-
-export default function AdminDashboardPage() {
-  return (
-    <Suspense fallback={<Skeleton className="h-96 w-full" />}>
-      <DashboardContent />
-    </Suspense>
   )
 }
