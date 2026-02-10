@@ -1,0 +1,71 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getAdminAuthForChannel } from '@/lib/auth/admin'
+import { createServiceClient } from '@/lib/supabase/server'
+
+// PUT /api/admin/channels/:id
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+  const auth = await getAdminAuthForChannel(id)
+  if (!auth) {
+    return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+  }
+
+  let body: { label?: string; config?: Record<string, unknown>; is_active?: boolean }
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Body JSON invalide' }, { status: 400 })
+  }
+
+  const updates: Record<string, unknown> = {}
+  if (body.label !== undefined) updates.label = body.label
+  if (body.config !== undefined) updates.config = body.config
+  if (body.is_active !== undefined) updates.is_active = body.is_active
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: 'Aucune modification fournie' }, { status: 400 })
+  }
+
+  const supabase = createServiceClient()
+  const { data, error } = await supabase
+    .schema('notifications')
+    .from('channels')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) {
+    return NextResponse.json({ error: 'Erreur lors de la mise à jour' }, { status: 500 })
+  }
+
+  return NextResponse.json({ channel: data })
+}
+
+// DELETE /api/admin/channels/:id
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+  const auth = await getAdminAuthForChannel(id)
+  if (!auth) {
+    return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+  }
+
+  const supabase = createServiceClient()
+  const { error } = await supabase
+    .schema('notifications')
+    .from('channels')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    return NextResponse.json({ error: 'Erreur lors de la suppression' }, { status: 500 })
+  }
+
+  return NextResponse.json({ success: true })
+}
