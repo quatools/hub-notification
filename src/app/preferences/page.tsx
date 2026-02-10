@@ -3,10 +3,12 @@
 import { useEffect, useState, useCallback, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useClub } from "@/lib/contexts/club-context"
 import { toast } from "sonner"
+import Link from "next/link"
 import { Radio, Mail, BellOff, Info, LogIn } from "lucide-react"
 
 interface WorkflowOptout {
@@ -96,7 +98,10 @@ function PreferencesContent() {
       <div className="text-center py-12">
         <LogIn className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
         <h2 className="text-xl font-semibold mb-2">Connexion requise</h2>
-        <p className="text-muted-foreground">Connectez-vous pour gérer vos notifications.</p>
+        <p className="text-muted-foreground mb-4">Connectez-vous pour gérer vos notifications.</p>
+        <Button asChild>
+          <Link href="/login">Se connecter</Link>
+        </Button>
       </div>
     )
   }

@@ -83,9 +83,12 @@ export default function AdminDashboardPage() {
       <div className="text-center py-12">
         <LogIn className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
         <h2 className="text-xl font-semibold mb-2">Connexion requise</h2>
-        <p className="text-muted-foreground">
+        <p className="text-muted-foreground mb-4">
           Connectez-vous pour accéder à l&apos;espace d&apos;administration.
         </p>
+        <Button asChild>
+          <Link href="/login">Se connecter</Link>
+        </Button>
       </div>
     )
   }
