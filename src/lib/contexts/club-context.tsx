@@ -56,7 +56,7 @@ export function ClubProvider({ children }: { children: ReactNode }) {
         localStorage.setItem("selected_club_id", clubList[0].club_id)
       }
     } catch {
-      toast.error("Erreur lors du chargement de vos clubs")
+      toast.error("Erreur lors du chargement de vos organisations")
     } finally {
       setLoading(false)
     }

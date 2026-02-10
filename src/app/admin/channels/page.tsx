@@ -174,7 +174,7 @@ export default function AdminChannelsPage() {
               </div>
               <div className="space-y-2">
                 <Label>Label (optionnel)</Label>
-                <Input placeholder={newType === "discord_webhook" ? "ex: #notifications" : "ex: Contact club"} value={newLabel} onChange={(e) => setNewLabel(e.target.value)} />
+                <Input placeholder={newType === "discord_webhook" ? "ex: #notifications" : "ex: Contact organisation"} value={newLabel} onChange={(e) => setNewLabel(e.target.value)} />
               </div>
               {newType === "discord_webhook" ? (
                 <div className="space-y-2">
@@ -185,7 +185,7 @@ export default function AdminChannelsPage() {
               ) : (
                 <div className="space-y-2">
                   <Label>Adresse email</Label>
-                  <Input type="email" placeholder="contact@monclub.fr" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
+                  <Input type="email" placeholder="contact@monorg.fr" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
                 </div>
               )}
             </div>

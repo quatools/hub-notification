@@ -94,9 +94,9 @@ export default function AdminDashboardPage() {
     return (
       <div className="text-center py-12">
         <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Aucun club</h2>
+        <h2 className="text-xl font-semibold mb-2">Aucune organisation</h2>
         <p className="text-muted-foreground">
-          Vous n&apos;êtes administrateur d&apos;aucun club. Créez ou rejoignez un club depuis le BAAS.
+          Vous n&apos;êtes administrateur d&apos;aucune organisation.
         </p>
       </div>
     )
@@ -106,9 +106,9 @@ export default function AdminDashboardPage() {
     return (
       <div className="text-center py-12">
         <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Sélectionnez un club</h2>
+        <h2 className="text-xl font-semibold mb-2">Sélectionnez une organisation</h2>
         <p className="text-muted-foreground">
-          Choisissez un club dans le menu en haut de page.
+          Choisissez une organisation dans le menu en haut de page.
         </p>
       </div>
     )

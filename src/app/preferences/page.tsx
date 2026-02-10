@@ -105,8 +105,8 @@ function PreferencesContent() {
     return (
       <div className="text-center py-12">
         <BellOff className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Sélectionnez un club</h2>
-        <p className="text-muted-foreground">Choisissez un club dans le menu en haut de page.</p>
+        <h2 className="text-xl font-semibold mb-2">Sélectionnez une organisation</h2>
+        <p className="text-muted-foreground">Choisissez une organisation dans le menu en haut de page.</p>
       </div>
     )
   }
@@ -181,7 +181,7 @@ function PreferencesContent() {
           <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-md">
             <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
             <p className="text-xs text-muted-foreground">
-              Les canaux de notification (Discord, email du club) sont gérés par l&apos;administrateur de votre organisation.
+              Les canaux de notification (Discord, email) sont gérés par l&apos;administrateur de votre organisation.
               Vous pouvez uniquement activer ou désactiver la réception de chaque notification.
             </p>
           </div>

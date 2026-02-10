@@ -40,7 +40,7 @@ export function Navbar() {
         {!loading && clubs.length > 1 && (
           <Select value={selectedClub?.club_id || ""} onValueChange={selectClub}>
             <SelectTrigger className="w-[180px] h-8 text-sm">
-              <SelectValue placeholder="Choisir un club" />
+              <SelectValue placeholder="Choisir une organisation" />
             </SelectTrigger>
             <SelectContent>
               {clubs.map((club) => (
