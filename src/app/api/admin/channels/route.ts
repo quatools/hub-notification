@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminAuth } from '@/lib/auth/admin'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getAuthenticatedUser } from '@/lib/supabase/api-auth'
+import { verifyDiscordUser } from '@/lib/dispatchers/discord-dm'
 
 // GET /api/admin/channels?org_id=xxx
 export async function GET(request: NextRequest) {
@@ -77,6 +78,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Adresse email invalide' }, { status: 400 })
     }
     isVerified = true
+  }
+
+  if (body.type === 'discord_dm') {
+    const check = await verifyDiscordUser(body.config.discord_user_id as string)
+    if (!check.ok) {
+      return NextResponse.json({ error: check.error }, { status: 400 })
+    }
+    isVerified = true
+    if (!body.label && check.username) body.label = `MP @${check.username}`
   }
 
   const supabase = createServiceClient()

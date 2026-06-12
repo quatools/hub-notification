@@ -67,11 +67,13 @@ export function MessagePreview({
     )
   }
 
-  if (channelType === "discord_webhook") {
+  if (channelType === "discord_webhook" || channelType === "discord_dm") {
     return (
       <div className="space-y-1.5">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Aperçu — ce que verra le destinataire sur Discord
+          {channelType === "discord_dm"
+            ? "Aperçu — ce que verra le destinataire en message privé Discord"
+            : "Aperçu — ce que verra le destinataire sur Discord"}
         </p>
         <div className="rounded-lg p-4" style={{ background: "#313338" }}>
           <div className="flex items-start gap-2.5">

@@ -7,6 +7,7 @@
 
 import { createServiceClient } from '@/lib/supabase/server'
 import { getDispatcher } from '@/lib/dispatchers'
+import { verifyDiscordUser } from '@/lib/dispatchers/discord-dm'
 import { getSenderIdentity } from '@/lib/notifications/sender'
 import { logExecution } from '@/lib/notifications/log-execution'
 import {
@@ -97,7 +98,9 @@ export async function listChannels(orgId: string): Promise<McpResult> {
       destination:
         c.type === 'email'
           ? (c.config as { email?: string }).email
-          : `...${((c.config as { webhook_url?: string }).webhook_url || '').slice(-16)}`,
+          : c.type === 'discord_dm'
+            ? `discord_user_id ${(c.config as { discord_user_id?: string }).discord_user_id || '?'}`
+            : `...${((c.config as { webhook_url?: string }).webhook_url || '').slice(-16)}`,
       is_verified: c.is_verified,
       is_active: c.is_active,
     }))
@@ -107,8 +110,14 @@ export async function listChannels(orgId: string): Promise<McpResult> {
 async function verifyChannelConfig(
   type: string,
   webhookUrl?: string,
-  email?: string
+  email?: string,
+  discordUserId?: string
 ): Promise<{ config: Record<string, unknown>; isVerified: boolean } | { error: string }> {
+  if (type === 'discord_dm') {
+    const check = await verifyDiscordUser(discordUserId || '')
+    if (!check.ok) return { error: check.error || 'ID Discord invalide' }
+    return { config: { discord_user_id: discordUserId }, isVerified: true }
+  }
   if (type === 'discord_webhook') {
     if (
       !webhookUrl ||
@@ -137,7 +146,7 @@ async function verifyChannelConfig(
 
 export async function createChannel(orgId: string, userId: string, args: Args): Promise<McpResult> {
   const type = str(args.type) || ''
-  const verified = await verifyChannelConfig(type, str(args.webhook_url), str(args.email))
+  const verified = await verifyChannelConfig(type, str(args.webhook_url), str(args.email), str(args.discord_user_id))
   if ('error' in verified) return fail(verified.error)
 
   const supabase = createServiceClient()
@@ -181,9 +190,9 @@ export async function updateChannel(orgId: string, args: Args): Promise<McpResul
   if (args.label !== undefined) updates.label = str(args.label) || null
   if (typeof args.is_active === 'boolean') updates.is_active = args.is_active
 
-  const newDest = str(args.webhook_url) || str(args.email)
+  const newDest = str(args.webhook_url) || str(args.email) || str(args.discord_user_id)
   if (newDest) {
-    const verified = await verifyChannelConfig(channel.type, str(args.webhook_url), str(args.email))
+    const verified = await verifyChannelConfig(channel.type, str(args.webhook_url), str(args.email), str(args.discord_user_id))
     if ('error' in verified) return fail(verified.error)
     updates.config = verified.config
     updates.is_verified = verified.isVerified

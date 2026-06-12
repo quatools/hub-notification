@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/page-header"
 import { useClub } from "@/lib/contexts/club-context"
 import { toast } from "sonner"
 import Link from "next/link"
-import { Zap, Radio, Mail, Search, Info, Workflow as WorkflowIcon, ArrowRight, ChevronDown, ChevronRight } from "lucide-react"
+import { Zap, Radio, Mail, MessageCircle, Search, Info, Workflow as WorkflowIcon, ArrowRight, ChevronDown, ChevronRight } from "lucide-react"
 
 interface Event {
   id: string
@@ -188,6 +188,7 @@ export default function AdminEventsPage() {
                           <div className="flex shrink-0 flex-col items-end gap-2">
                             <div className="flex items-center gap-1.5 text-muted-foreground">
                               {event.supported_channels.includes("discord_webhook") && <Radio className="h-4 w-4 text-indigo-500" />}
+                              {event.supported_channels.includes("discord_dm") && <MessageCircle className="h-4 w-4 text-violet-500" />}
                               {event.supported_channels.includes("email") && <Mail className="h-4 w-4 text-blue-500" />}
                             </div>
                             {activeCount > 0 ? (

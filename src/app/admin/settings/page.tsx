@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { PageHeader } from "@/components/page-header"
 import { SendingDomainCard } from "@/components/sending-domain-card"
+import { DiscordBotCard } from "@/components/discord-bot-card"
 import { McpConnectCard } from "@/components/mcp-connect-card"
 import { useClub } from "@/lib/contexts/club-context"
 import { toast } from "sonner"
@@ -149,6 +150,8 @@ export default function AdminSettingsPage() {
       </Card>
 
       <SendingDomainCard orgId={selectedClub.club_id} />
+
+      <DiscordBotCard />
 
       <McpConnectCard orgId={selectedClub.club_id} />
     </div>

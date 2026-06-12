@@ -1,6 +1,7 @@
 import type { NotificationEvent } from '@/lib/types/notifications'
 import type { SenderIdentity } from '@/lib/notifications/sender'
 import { dispatchDiscordWebhook } from './discord-webhook'
+import { dispatchDiscordDm } from './discord-dm'
 import { dispatchEmail } from './email'
 
 export interface DispatchResult {
@@ -26,6 +27,7 @@ type DispatchFn = (params: DispatchParams) => Promise<DispatchResult>
 /** Registry des dispatchers par type de canal */
 const dispatchers: Record<string, DispatchFn> = {
   discord_webhook: dispatchDiscordWebhook,
+  discord_dm: dispatchDiscordDm,
   email: dispatchEmail,
 }
 

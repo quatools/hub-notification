@@ -20,7 +20,7 @@ import { useClub } from "@/lib/contexts/club-context"
 import { toast } from "sonner"
 import Link from "next/link"
 import {
-  Plus, Radio, Mail, Trash2, Pencil, Send, ChevronDown, ChevronRight,
+  Plus, Radio, Mail, MessageCircle, Trash2, Pencil, Send, ChevronDown, ChevronRight,
   Loader2, Workflow as WorkflowIcon, AlertCircle, RotateCcw
 } from "lucide-react"
 
@@ -68,6 +68,12 @@ const CATEGORY_LABELS: Record<string, string> = {
   team: "Équipes",
   shop: "Boutique & préventes",
   system: "Système",
+}
+
+const CHANNEL_TYPE_LABELS: Record<string, string> = {
+  discord_webhook: "Discord",
+  discord_dm: "MP Discord",
+  email: "Email",
 }
 
 function WorkflowsContent() {
@@ -164,6 +170,7 @@ function WorkflowsContent() {
   const getChannelIcon = (type: string) => {
     switch (type) {
       case "discord_webhook": return <Radio className="h-4 w-4 text-indigo-500" />
+      case "discord_dm": return <MessageCircle className="h-4 w-4 text-violet-500" />
       case "email": return <Mail className="h-4 w-4 text-blue-500" />
       default: return <Radio className="h-4 w-4" />
     }
@@ -171,7 +178,7 @@ function WorkflowsContent() {
 
   const getChannelLabel = (ch: Channel | null) => {
     if (!ch) return "Canal inconnu"
-    return ch.label || (ch.type === "discord_webhook" ? "Discord" : ch.type === "email" ? "Email" : ch.type)
+    return ch.label || CHANNEL_TYPE_LABELS[ch.type] || ch.type
   }
 
   // Extract variables from payload_schema
@@ -396,7 +403,9 @@ function WorkflowsContent() {
 
   // Format for channel type
   const getDefaultFormat = (channelType: string) => {
-    return channelType === "email" ? "html" : channelType === "discord_webhook" ? "markdown" : "text"
+    if (channelType === "email") return "html"
+    if (channelType === "discord_webhook" || channelType === "discord_dm") return "markdown"
+    return "text"
   }
 
   if (clubLoading || !selectedClub) {
@@ -627,7 +636,7 @@ function WorkflowsContent() {
                     {createCompatibleChannels.map((ch) => (
                       <SelectItem key={ch.id} value={ch.id}>
                         <span className="flex items-center gap-2">
-                          {ch.type === "discord_webhook" ? "Discord" : "Email"} — {ch.label || ch.id.slice(0, 8)}
+                          {CHANNEL_TYPE_LABELS[ch.type] || ch.type} — {ch.label || ch.id.slice(0, 8)}
                         </span>
                       </SelectItem>
                     ))}

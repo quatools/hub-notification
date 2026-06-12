@@ -14,7 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { PageHeader } from "@/components/page-header"
 import { useClub } from "@/lib/contexts/club-context"
 import { toast } from "sonner"
-import { Plus, Radio, Mail, Trash2, Pencil, CheckCircle, XCircle, Loader2 } from "lucide-react"
+import { Plus, Radio, Mail, MessageCircle, Trash2, Pencil, CheckCircle, XCircle, Loader2 } from "lucide-react"
 
 interface Channel {
   id: string
@@ -39,6 +39,7 @@ export default function AdminChannelsPage() {
   const [formLabel, setFormLabel] = useState("")
   const [formWebhookUrl, setFormWebhookUrl] = useState("")
   const [formEmail, setFormEmail] = useState("")
+  const [formDiscordUserId, setFormDiscordUserId] = useState("")
 
   const isEditing = !!editingChannel
 
@@ -64,6 +65,7 @@ export default function AdminChannelsPage() {
     setFormLabel("")
     setFormWebhookUrl("")
     setFormEmail("")
+    setFormDiscordUserId("")
   }
 
   const openCreate = () => {
@@ -77,6 +79,7 @@ export default function AdminChannelsPage() {
     setFormLabel(channel.label || "")
     setFormWebhookUrl(channel.type === "discord_webhook" ? (channel.config.webhook_url as string) || "" : "")
     setFormEmail(channel.type === "email" ? (channel.config.email as string) || "" : "")
+    setFormDiscordUserId(channel.type === "discord_dm" ? (channel.config.discord_user_id as string) || "" : "")
     setDialogOpen(true)
   }
 
@@ -84,8 +87,9 @@ export default function AdminChannelsPage() {
     if (!orgId) return
     setSaving(true)
     try {
-      const config: Record<string, unknown> = formType === "discord_webhook"
-        ? { webhook_url: formWebhookUrl }
+      const config: Record<string, unknown> =
+        formType === "discord_webhook" ? { webhook_url: formWebhookUrl }
+        : formType === "discord_dm" ? { discord_user_id: formDiscordUserId.trim() }
         : { email: formEmail }
 
       const url = isEditing ? `/api/admin/channels/${editingChannel.id}` : "/api/admin/channels"
@@ -147,6 +151,7 @@ export default function AdminChannelsPage() {
   const getChannelIcon = (type: string) => {
     switch (type) {
       case "discord_webhook": return <Radio className="h-5 w-5 text-indigo-500" />
+      case "discord_dm": return <MessageCircle className="h-5 w-5 text-violet-500" />
       case "email": return <Mail className="h-5 w-5 text-blue-500" />
       default: return <Radio className="h-5 w-5" />
     }
@@ -155,6 +160,7 @@ export default function AdminChannelsPage() {
   const getChannelTypeLabel = (type: string) => {
     switch (type) {
       case "discord_webhook": return "Discord Webhook"
+      case "discord_dm": return "MP Discord"
       case "email": return "Email"
       default: return type
     }
@@ -165,6 +171,7 @@ export default function AdminChannelsPage() {
       const url = channel.config.webhook_url as string
       return url ? `...${url.slice(-20)}` : ""
     }
+    if (channel.type === "discord_dm") return `ID ${channel.config.discord_user_id || ""}`
     if (channel.type === "email") return channel.config.email as string || ""
     return ""
   }
@@ -200,7 +207,8 @@ export default function AdminChannelsPage() {
               <Select value={formType} onValueChange={setFormType} disabled={isEditing}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="discord_webhook">Discord Webhook</SelectItem>
+                  <SelectItem value="discord_webhook">Discord Webhook (salon)</SelectItem>
+                  <SelectItem value="discord_dm">MP Discord (message privé)</SelectItem>
                   <SelectItem value="email">Email</SelectItem>
                 </SelectContent>
               </Select>
@@ -214,13 +222,24 @@ export default function AdminChannelsPage() {
               <Label>Label (optionnel)</Label>
               <Input placeholder={formType === "discord_webhook" ? "ex: #notifications" : "ex: Contact organisation"} value={formLabel} onChange={(e) => setFormLabel(e.target.value)} />
             </div>
-            {formType === "discord_webhook" ? (
+            {formType === "discord_webhook" && (
               <div className="space-y-2">
                 <Label>URL du Webhook</Label>
                 <Input placeholder="https://discord.com/api/webhooks/..." value={formWebhookUrl} onChange={(e) => setFormWebhookUrl(e.target.value)} />
                 <p className="text-xs text-muted-foreground">Paramètres du serveur &gt; Intégrations &gt; Webhooks</p>
               </div>
-            ) : (
+            )}
+            {formType === "discord_dm" && (
+              <div className="space-y-2">
+                <Label>ID Discord du destinataire</Label>
+                <Input placeholder="ex: 137245874929861234" value={formDiscordUserId} onChange={(e) => setFormDiscordUserId(e.target.value)} />
+                <p className="text-xs text-muted-foreground">
+                  Clic droit sur le membre &gt; « Copier l&apos;identifiant » (mode développeur requis).
+                  Le bot Notify doit être présent sur votre serveur Discord.
+                </p>
+              </div>
+            )}
+            {formType === "email" && (
               <div className="space-y-2">
                 <Label>Adresse email</Label>
                 <Input type="email" placeholder="contact@monorg.fr" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} />
@@ -229,7 +248,15 @@ export default function AdminChannelsPage() {
           </div>
           <DialogFooter>
             <DialogClose asChild><Button variant="outline">Annuler</Button></DialogClose>
-            <Button onClick={handleSubmit} disabled={saving || (formType === "discord_webhook" ? !formWebhookUrl : !formEmail)}>
+            <Button
+              onClick={handleSubmit}
+              disabled={
+                saving ||
+                (formType === "discord_webhook" ? !formWebhookUrl
+                  : formType === "discord_dm" ? !formDiscordUserId.trim()
+                  : !formEmail)
+              }
+            >
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {isEditing ? "Enregistrer" : "Créer"}
             </Button>

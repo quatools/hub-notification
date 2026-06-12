@@ -39,13 +39,14 @@ export const hubTools: McpTool[] = [
   {
     name: 'create_channel',
     description:
-      "Crée un canal de notification. Pour Discord : fournir webhook_url (https://discord.com/api/webhooks/...), vérifié automatiquement. Pour email : fournir email.",
+      "Crée un canal de notification. discord_webhook : message dans un salon (fournir webhook_url, vérifié automatiquement). discord_dm : message privé à un membre via le bot Notify, qui doit être présent sur le serveur de l'organisation (fournir discord_user_id). email : fournir email.",
     inputSchema: {
       type: 'object',
       properties: {
-        type: { type: 'string', enum: ['discord_webhook', 'email'], description: 'Type de canal' },
-        label: { type: 'string', description: 'Nom du canal (ex: "#annonces", "Email staff")' },
+        type: { type: 'string', enum: ['discord_webhook', 'discord_dm', 'email'], description: 'Type de canal' },
+        label: { type: 'string', description: 'Nom du canal (ex: "#annonces", "MP capitaine", "Email staff")' },
         webhook_url: { type: 'string', description: 'URL du webhook Discord (type discord_webhook)' },
+        discord_user_id: { type: 'string', description: 'ID Discord du destinataire des MP (type discord_dm)' },
         email: { type: 'string', description: 'Adresse email (type email)' },
       },
       required: ['type'],
@@ -60,6 +61,7 @@ export const hubTools: McpTool[] = [
         channel_id: { type: 'string', description: 'ID du canal' },
         label: { type: 'string' },
         webhook_url: { type: 'string', description: 'Nouvelle URL webhook (canal Discord)' },
+        discord_user_id: { type: 'string', description: 'Nouvel ID Discord (canal MP)' },
         email: { type: 'string', description: 'Nouvelle adresse (canal email)' },
         is_active: { type: 'boolean' },
       },
