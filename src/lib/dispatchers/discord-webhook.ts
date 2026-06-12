@@ -6,6 +6,7 @@ const CATEGORY_COLORS: Record<string, number> = {
   billing: 0x3498db,  // bleu
   member: 0x2ecc71,   // vert
   team: 0xe67e22,     // orange
+  shop: 0x9b59b6,     // violet
   system: 0x95a5a6,   // gris
 }
 
