@@ -3,6 +3,7 @@ import { getAdminAuthForWorkflow } from '@/lib/auth/admin'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getDispatcher } from '@/lib/dispatchers'
 import { getSenderIdentity } from '@/lib/notifications/sender'
+import { logExecution } from '@/lib/notifications/log-execution'
 import type { NotificationEvent } from '@/lib/types/notifications'
 
 /**
@@ -130,6 +131,18 @@ export async function POST(
       format: (options.step?.format || step.format) as 'text' | 'html' | 'markdown',
     },
     sender,
+  })
+
+  await logExecution({
+    workflowId: id,
+    eventSlug: event.slug,
+    channelId: channel.id,
+    userId: auth.user_id,
+    orgId: workflow.org_id,
+    payload: testPayload,
+    success: result.success,
+    error: result.error,
+    isTest: true,
   })
 
   return NextResponse.json({

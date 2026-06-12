@@ -8,6 +8,7 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { getDispatcher } from '@/lib/dispatchers'
 import { getSenderIdentity } from '@/lib/notifications/sender'
+import { logExecution } from '@/lib/notifications/log-execution'
 import {
   createTemDomain,
   getTemDomain,
@@ -388,7 +389,7 @@ export async function deleteWorkflow(orgId: string, args: Args): Promise<McpResu
   return ok({ deleted: true })
 }
 
-export async function testWorkflow(orgId: string, args: Args): Promise<McpResult> {
+export async function testWorkflow(orgId: string, userId: string, args: Args): Promise<McpResult> {
   const workflowId = str(args.workflow_id)
   if (!workflowId) return fail('workflow_id requis')
 
@@ -440,6 +441,18 @@ export async function testWorkflow(orgId: string, args: Args): Promise<McpResult
     payload,
     step: { subject: step.subject, body: step.body, format: step.format },
     sender,
+  })
+
+  await logExecution({
+    workflowId,
+    eventSlug: event.slug,
+    channelId: channel.id,
+    userId,
+    orgId,
+    payload,
+    success: result.success,
+    error: result.error,
+    isTest: true,
   })
 
   if (!result.success) return fail(`Échec de l'envoi: ${result.error}`)

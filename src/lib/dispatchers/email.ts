@@ -23,8 +23,15 @@ function getTransporter(): Transporter | null {
   transporter = nodemailer.createTransport({
     host,
     port,
-    secure: port === 465, // 465 = TLS implicite, 587 = STARTTLS
+    // 465/2465 = TLS implicite ; 587/2587 = STARTTLS.
+    // Les ports 2465/2587 sont les alternatifs Scaleway TEM, utiles quand
+    // l'hébergeur bloque les ports SMTP standards en sortie.
+    secure: port === 465 || port === 2465,
     auth: { user, pass },
+    // Échouer vite et proprement plutôt que de pendre la requête HTTP
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 30_000,
   })
   return transporter
 }

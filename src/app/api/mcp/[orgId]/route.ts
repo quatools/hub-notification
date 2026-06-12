@@ -45,7 +45,7 @@ async function executeTool(name: string, args: Args, orgId: string, userId: stri
     case 'create_workflow': return createWorkflow(orgId, userId, args)
     case 'update_workflow': return updateWorkflow(orgId, args)
     case 'delete_workflow': return deleteWorkflow(orgId, args)
-    case 'test_workflow': return testWorkflow(orgId, args)
+    case 'test_workflow': return testWorkflow(orgId, userId, args)
     case 'get_logs': return getLogs(orgId, args)
     case 'get_sender_identity': return getSenderIdentityTool(orgId)
     case 'set_sender_identity': return setSenderIdentity(orgId, args)

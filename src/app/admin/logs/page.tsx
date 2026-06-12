@@ -27,6 +27,7 @@ interface LogEntry {
   attempts: number
   sent_at: string | null
   created_at: string
+  is_test?: boolean
   events?: { label: string; category: string } | null
   channels?: { type: string; label: string | null } | null
 }
@@ -181,7 +182,12 @@ function LogsContent() {
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell>{getStatusBadge(log.status)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        {getStatusBadge(log.status)}
+                        {log.is_test && <Badge variant="outline" className="text-xs">Test</Badge>}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right text-sm">{log.attempts}</TableCell>
                   </TableRow>
                 ))}
