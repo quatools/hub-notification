@@ -1,15 +1,22 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useState, useRef, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Bell, Loader2 } from "lucide-react"
 
-export default function LoginPage() {
+/** Seules les destinations internes sont autorisées (anti open-redirect). */
+function safeNext(next: string | null): string {
+  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/admin"
+}
+
+function LoginContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const next = safeNext(searchParams.get("next"))
   const [isLoading, setIsLoading] = useState(false)
   const supabaseRef = useRef<SupabaseClient | null>(null)
 
@@ -19,9 +26,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     supabaseRef.current?.auth.getSession().then(({ data: { session } }) => {
-      if (session) router.push("/admin")
+      if (session) router.push(next)
     })
-  }, [router])
+  }, [router, next])
 
   const handleDiscordLogin = async () => {
     if (!supabaseRef.current) return
@@ -29,7 +36,7 @@ export default function LoginPage() {
     const { error } = await supabaseRef.current.auth.signInWithOAuth({
       provider: "discord",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
       },
     })
     if (error) {
@@ -69,5 +76,13 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   )
 }

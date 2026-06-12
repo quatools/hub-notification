@@ -6,6 +6,9 @@ import type { NextRequest } from 'next/server'
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
+  // Destination post-login (ex: reprise du flux OAuth MCP) — interne uniquement
+  const rawNext = requestUrl.searchParams.get('next')
+  const next = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/admin'
 
   if (code) {
     const cookieStore = await cookies()
@@ -38,7 +41,8 @@ export async function GET(request: NextRequest) {
     }
 
     // HTML redirect to ensure cookies propagate
-    const html = `<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=/admin"><title>Redirecting...</title></head><body><script>window.location.href='/admin';</script></body></html>`
+    const target = next.replace(/"/g, '')
+    const html = `<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=${target}"><title>Redirecting...</title></head><body><script>window.location.href=${JSON.stringify(target)};</script></body></html>`
     return new Response(html, {
       status: 200,
       headers: { 'Content-Type': 'text/html' },
