@@ -1,15 +1,32 @@
-import { Resend } from 'resend'
+import nodemailer, { type Transporter } from 'nodemailer'
 import { renderTemplate } from '@/lib/notifications/templates'
 import { wrapEmailLayout } from './email-layout'
 import type { DispatchResult, DispatchParams } from './index'
 
-let resend: Resend | null = null
+/**
+ * Envoi par SMTP générique (nodemailer) : provider-agnostique.
+ * Fonctionne avec tout fournisseur SMTP (Scaleway TEM, Brevo, OVH, ...).
+ * Config via env : SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM.
+ */
 
-function getResendClient(): Resend {
-  if (!resend) {
-    resend = new Resend(process.env.RESEND_API_KEY)
-  }
-  return resend
+let transporter: Transporter | null = null
+
+function getTransporter(): Transporter | null {
+  if (transporter) return transporter
+
+  const host = process.env.SMTP_HOST
+  const user = process.env.SMTP_USER
+  const pass = process.env.SMTP_PASS
+  if (!host || !user || !pass) return null
+
+  const port = Number(process.env.SMTP_PORT) || 587
+  transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465, // 465 = TLS implicite, 587 = STARTTLS
+    auth: { user, pass },
+  })
+  return transporter
 }
 
 export async function dispatchEmail(params: DispatchParams): Promise<DispatchResult> {
@@ -18,6 +35,11 @@ export async function dispatchEmail(params: DispatchParams): Promise<DispatchRes
   const email = config.email as string
   if (!email) {
     return { success: false, error: 'email manquant dans la config du canal' }
+  }
+
+  const smtp = getTransporter()
+  if (!smtp) {
+    return { success: false, error: 'SMTP non configuré (SMTP_HOST, SMTP_USER, SMTP_PASS requis)' }
   }
 
   // Construire le sujet depuis le step
@@ -33,16 +55,12 @@ export async function dispatchEmail(params: DispatchParams): Promise<DispatchRes
   const html = wrapEmailLayout(bodyContent, event.label)
 
   try {
-    const { error } = await getResendClient().emails.send({
-      from: 'Quatools Notifications <notifications@quatools.fr>',
+    await smtp.sendMail({
+      from: process.env.SMTP_FROM || 'Quatools Notifications <notifications@quatools.fr>',
       to: email,
       subject,
       html,
     })
-
-    if (error) {
-      return { success: false, error: `Resend: ${error.message}` }
-    }
 
     return { success: true }
   } catch (error) {
