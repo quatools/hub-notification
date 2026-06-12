@@ -30,6 +30,40 @@ export async function PUT(
   }
 
   const supabase = createServiceClient()
+
+  // Si la config change, re-vérifier la destination (même logique qu'à la création)
+  if (body.config !== undefined) {
+    const { data: channel } = await supabase
+      .schema('notifications')
+      .from('channels')
+      .select('type')
+      .eq('id', id)
+      .single()
+
+    if (channel?.type === 'discord_webhook') {
+      const webhookUrl = body.config.webhook_url as string
+      if (!webhookUrl || (
+        !webhookUrl.startsWith('https://discord.com/api/webhooks/') &&
+        !webhookUrl.startsWith('https://discordapp.com/api/webhooks/')
+      )) {
+        return NextResponse.json({ error: 'URL webhook Discord invalide' }, { status: 400 })
+      }
+      try {
+        const res = await fetch(webhookUrl)
+        updates.is_verified = res.ok
+      } catch {
+        updates.is_verified = false
+      }
+    }
+
+    if (channel?.type === 'email') {
+      const email = body.config.email as string
+      if (!email || !email.includes('@')) {
+        return NextResponse.json({ error: 'Adresse email invalide' }, { status: 400 })
+      }
+      updates.is_verified = true
+    }
+  }
   const { data, error } = await supabase
     .schema('notifications')
     .from('channels')

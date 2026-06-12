@@ -9,11 +9,12 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { PageHeader } from "@/components/page-header"
 import { useClub } from "@/lib/contexts/club-context"
 import { toast } from "sonner"
-import { Plus, Radio, Mail, Trash2, CheckCircle, XCircle, Loader2 } from "lucide-react"
+import { Plus, Radio, Mail, Trash2, Pencil, CheckCircle, XCircle, Loader2 } from "lucide-react"
 
 interface Channel {
   id: string
@@ -30,12 +31,16 @@ export default function AdminChannelsPage() {
   const orgId = selectedClub?.club_id
   const [channels, setChannels] = useState<Channel[]>([])
   const [loading, setLoading] = useState(true)
-  const [createOpen, setCreateOpen] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const [newType, setNewType] = useState("discord_webhook")
-  const [newLabel, setNewLabel] = useState("")
-  const [newWebhookUrl, setNewWebhookUrl] = useState("")
-  const [newEmail, setNewEmail] = useState("")
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  // null = création, sinon canal en cours d'édition
+  const [editingChannel, setEditingChannel] = useState<Channel | null>(null)
+  const [formType, setFormType] = useState("discord_webhook")
+  const [formLabel, setFormLabel] = useState("")
+  const [formWebhookUrl, setFormWebhookUrl] = useState("")
+  const [formEmail, setFormEmail] = useState("")
+
+  const isEditing = !!editingChannel
 
   const fetchChannels = useCallback(async () => {
     if (!orgId) { setLoading(false); return }
@@ -53,42 +58,63 @@ export default function AdminChannelsPage() {
 
   useEffect(() => { setLoading(true); fetchChannels() }, [fetchChannels])
 
-  const handleCreate = async () => {
-    if (!orgId) return
-    setCreating(true)
-    try {
-      const config: Record<string, unknown> = newType === "discord_webhook"
-        ? { webhook_url: newWebhookUrl }
-        : { email: newEmail }
+  const resetForm = () => {
+    setEditingChannel(null)
+    setFormType("discord_webhook")
+    setFormLabel("")
+    setFormWebhookUrl("")
+    setFormEmail("")
+  }
 
-      const res = await fetch("/api/admin/channels", {
-        method: "POST",
+  const openCreate = () => {
+    resetForm()
+    setDialogOpen(true)
+  }
+
+  const openEdit = (channel: Channel) => {
+    setEditingChannel(channel)
+    setFormType(channel.type)
+    setFormLabel(channel.label || "")
+    setFormWebhookUrl(channel.type === "discord_webhook" ? (channel.config.webhook_url as string) || "" : "")
+    setFormEmail(channel.type === "email" ? (channel.config.email as string) || "" : "")
+    setDialogOpen(true)
+  }
+
+  const handleSubmit = async () => {
+    if (!orgId) return
+    setSaving(true)
+    try {
+      const config: Record<string, unknown> = formType === "discord_webhook"
+        ? { webhook_url: formWebhookUrl }
+        : { email: formEmail }
+
+      const url = isEditing ? `/api/admin/channels/${editingChannel.id}` : "/api/admin/channels"
+      const method = isEditing ? "PUT" : "POST"
+      const body = isEditing
+        ? { label: formLabel || null, config }
+        : { org_id: orgId, type: formType, label: formLabel || undefined, config }
+
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ org_id: orgId, type: newType, label: newLabel || undefined, config }),
+        body: JSON.stringify(body),
       })
 
       if (!res.ok) {
         const err = await res.json()
-        toast.error(err.error || "Erreur lors de la création")
+        toast.error(err.error || "Erreur lors de l'enregistrement")
         return
       }
 
-      toast.success("Canal créé avec succès")
-      setCreateOpen(false)
+      toast.success(isEditing ? "Canal mis à jour" : "Canal créé avec succès")
+      setDialogOpen(false)
       resetForm()
       fetchChannels()
     } catch {
-      toast.error("Erreur lors de la création")
+      toast.error("Erreur lors de l'enregistrement")
     } finally {
-      setCreating(false)
+      setSaving(false)
     }
-  }
-
-  const resetForm = () => {
-    setNewType("discord_webhook")
-    setNewLabel("")
-    setNewWebhookUrl("")
-    setNewEmail("")
   }
 
   const handleToggle = async (channel: Channel) => {
@@ -143,61 +169,73 @@ export default function AdminChannelsPage() {
     return ""
   }
 
-  if (clubLoading || !selectedClub) {
-    return <div className="space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-24" /><Skeleton className="h-24" /></div>
-  }
-
-  if (loading) {
+  if (clubLoading || !selectedClub || loading) {
     return <div className="space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-24" /><Skeleton className="h-24" /></div>
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Canaux</h1>
-        <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) resetForm() }}>
-          <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" />Ajouter un canal</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Nouveau canal</DialogTitle></DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Type</Label>
-                <Select value={newType} onValueChange={setNewType}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="discord_webhook">Discord Webhook</SelectItem>
-                    <SelectItem value="email">Email</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Label (optionnel)</Label>
-                <Input placeholder={newType === "discord_webhook" ? "ex: #notifications" : "ex: Contact organisation"} value={newLabel} onChange={(e) => setNewLabel(e.target.value)} />
-              </div>
-              {newType === "discord_webhook" ? (
-                <div className="space-y-2">
-                  <Label>URL du Webhook</Label>
-                  <Input placeholder="https://discord.com/api/webhooks/..." value={newWebhookUrl} onChange={(e) => setNewWebhookUrl(e.target.value)} />
-                  <p className="text-xs text-muted-foreground">Paramètres du serveur &gt; Intégrations &gt; Webhooks</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Label>Adresse email</Label>
-                  <Input type="email" placeholder="contact@monorg.fr" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
-                </div>
+      <PageHeader
+        title="Canaux"
+        description="Un canal est une destination de notification : un salon Discord (via webhook) ou une adresse email. Vous les brancherez ensuite sur des événements via les workflows."
+        flowStep="channel"
+        actions={
+          <Button onClick={openCreate}><Plus className="h-4 w-4 mr-2" />Ajouter un canal</Button>
+        }
+      />
+
+      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm() }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{isEditing ? "Modifier le canal" : "Nouveau canal"}</DialogTitle>
+            <DialogDescription>
+              {isEditing
+                ? "Modifiez le nom ou la destination de ce canal. Les workflows qui l'utilisent ne sont pas impactés."
+                : "Une destination vers laquelle vos workflows pourront envoyer des notifications."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Select value={formType} onValueChange={setFormType} disabled={isEditing}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="discord_webhook">Discord Webhook</SelectItem>
+                  <SelectItem value="email">Email</SelectItem>
+                </SelectContent>
+              </Select>
+              {isEditing && (
+                <p className="text-xs text-muted-foreground">
+                  Le type n&apos;est pas modifiable. Pour changer de type, créez un nouveau canal.
+                </p>
               )}
             </div>
-            <DialogFooter>
-              <DialogClose asChild><Button variant="outline">Annuler</Button></DialogClose>
-              <Button onClick={handleCreate} disabled={creating || (newType === "discord_webhook" ? !newWebhookUrl : !newEmail)}>
-                {creating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Créer
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+            <div className="space-y-2">
+              <Label>Label (optionnel)</Label>
+              <Input placeholder={formType === "discord_webhook" ? "ex: #notifications" : "ex: Contact organisation"} value={formLabel} onChange={(e) => setFormLabel(e.target.value)} />
+            </div>
+            {formType === "discord_webhook" ? (
+              <div className="space-y-2">
+                <Label>URL du Webhook</Label>
+                <Input placeholder="https://discord.com/api/webhooks/..." value={formWebhookUrl} onChange={(e) => setFormWebhookUrl(e.target.value)} />
+                <p className="text-xs text-muted-foreground">Paramètres du serveur &gt; Intégrations &gt; Webhooks</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Adresse email</Label>
+                <Input type="email" placeholder="contact@monorg.fr" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Annuler</Button></DialogClose>
+            <Button onClick={handleSubmit} disabled={saving || (formType === "discord_webhook" ? !formWebhookUrl : !formEmail)}>
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {isEditing ? "Enregistrer" : "Créer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {channels.length === 0 ? (
         <Card className="border-dashed">
@@ -205,7 +243,7 @@ export default function AdminChannelsPage() {
             <Radio className="h-10 w-10 mx-auto text-muted-foreground mb-4" />
             <h3 className="font-semibold mb-2">Aucun canal configuré</h3>
             <p className="text-sm text-muted-foreground mb-4">Ajoutez un webhook Discord ou une adresse email pour commencer.</p>
-            <Button onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4 mr-2" />Ajouter un canal</Button>
+            <Button onClick={openCreate}><Plus className="h-4 w-4 mr-2" />Ajouter un canal</Button>
           </CardContent>
         </Card>
       ) : (
@@ -226,6 +264,9 @@ export default function AdminChannelsPage() {
                       {channel.is_verified ? <><CheckCircle className="h-3 w-3 mr-1" />Vérifié</> : <><XCircle className="h-3 w-3 mr-1" />Non vérifié</>}
                     </Badge>
                     <Switch checked={channel.is_active} onCheckedChange={() => handleToggle(channel)} />
+                    <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => openEdit(channel)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
