@@ -456,7 +456,16 @@ export async function testWorkflow(orgId: string, userId: string, args: Args): P
   })
 
   if (!result.success) return fail(`Échec de l'envoi: ${result.error}`)
-  return ok({ sent: true, test_payload: payload, destination: overrideEmail || 'canal du workflow' })
+  return ok({
+    sent: true,
+    test_payload: payload,
+    destination: overrideEmail || 'canal du workflow',
+    // Le test fonctionne même sur un workflow inactif (pour vérifier le rendu
+    // avant activation) — on rend l'état explicite.
+    ...(!workflow.is_active && {
+      warning: "Ce workflow est INACTIF : le test est parti, mais les événements réels ne déclencheront rien tant qu'il n'est pas activé (update_workflow is_active=true)",
+    }),
+  })
 }
 
 // ---- Historique ----

@@ -16,15 +16,14 @@ export async function GET(request: NextRequest) {
   const eventSlug = request.nextUrl.searchParams.get('event_slug')
 
   const supabase = createServiceClient()
+
+  // Note : pas de jointure PostgREST sur event_slug (aucune FK vers events.slug),
+  // les labels d'événements sont fusionnés via une seconde requête.
   let query = supabase
     .schema('notifications')
     .from('workflow_executions')
     .select(`
       *,
-      events:event_slug (
-        label,
-        category
-      ),
       channels:channel_id (
         type,
         label
@@ -41,29 +40,28 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     console.error('Erreur chargement logs:', error)
-    // Fallback sans les jointures si elles échouent
-    const { data: fallbackData, error: fallbackError, count: fallbackCount } = await supabase
-      .schema('notifications')
-      .from('workflow_executions')
-      .select('*', { count: 'exact' })
-      .eq('org_id', auth.org_id)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1)
-
-    if (fallbackError) {
-      return NextResponse.json({ error: 'Erreur lors du chargement des logs' }, { status: 500 })
-    }
-
-    return NextResponse.json({
-      logs: fallbackData,
-      total: fallbackCount || 0,
-      limit,
-      offset,
-    })
+    return NextResponse.json({ error: 'Erreur lors du chargement des logs' }, { status: 500 })
   }
 
+  // Enrichir avec les labels d'événements
+  const slugs = Array.from(new Set((data || []).map((l) => l.event_slug).filter(Boolean)))
+  let eventsBySlug = new Map<string, { label: string; category: string }>()
+  if (slugs.length > 0) {
+    const { data: events } = await supabase
+      .schema('notifications')
+      .from('events')
+      .select('slug, label, category')
+      .in('slug', slugs)
+    eventsBySlug = new Map((events || []).map((e) => [e.slug, { label: e.label, category: e.category }]))
+  }
+
+  const logs = (data || []).map((l) => ({
+    ...l,
+    events: eventsBySlug.get(l.event_slug) || null,
+  }))
+
   return NextResponse.json({
-    logs: data,
+    logs,
     total: count || 0,
     limit,
     offset,

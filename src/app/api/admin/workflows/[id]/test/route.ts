@@ -149,5 +149,8 @@ export async function POST(
     success: result.success,
     error: result.error || null,
     test_payload: testPayload,
+    warning: workflow.is_active
+      ? null
+      : 'Workflow inactif : le test est parti, mais les événements réels ne déclencheront rien',
   })
 }
