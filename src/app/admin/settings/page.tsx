@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { PageHeader } from "@/components/page-header"
 import { SendingDomainCard } from "@/components/sending-domain-card"
+import { McpConnectCard } from "@/components/mcp-connect-card"
 import { useClub } from "@/lib/contexts/club-context"
 import { toast } from "sonner"
 import { Loader2, Mail, MessageSquare, Sparkles } from "lucide-react"
@@ -148,6 +149,8 @@ export default function AdminSettingsPage() {
       </Card>
 
       <SendingDomainCard orgId={selectedClub.club_id} />
+
+      <McpConnectCard orgId={selectedClub.club_id} />
     </div>
   )
 }
