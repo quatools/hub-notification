@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { PageHeader } from "@/components/page-header"
 import { useClub } from "@/lib/contexts/club-context"
 import { toast } from "sonner"
 import { ChevronLeft, ChevronRight, CheckCircle, XCircle, Clock, Radio, Mail } from "lucide-react"
@@ -110,9 +111,11 @@ function LogsContent() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Historique</h1>
-        <div className="flex items-center gap-2">
+      <PageHeader
+        title="Historique"
+        description="Chaque notification envoyée (ou échouée) par vos workflows est tracée ici, avec le détail du message et l'erreur éventuelle."
+        flowStep="delivery"
+        actions={
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[150px]">
               <SelectValue placeholder="Statut" />
@@ -124,8 +127,8 @@ function LogsContent() {
               <SelectItem value="pending">En attente</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-      </div>
+        }
+      />
 
       {loading ? (
         <div className="space-y-2">

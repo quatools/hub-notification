@@ -6,9 +6,10 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useClub } from "@/lib/contexts/club-context"
+import { FlowDiagram } from "@/components/flow-diagram"
 import { toast } from "sonner"
 import Link from "next/link"
-import { Radio, Workflow, ScrollText, AlertCircle, CheckCircle, XCircle, LogIn } from "lucide-react"
+import { Radio, Workflow, ScrollText, AlertCircle, CheckCircle, CheckCircle2, XCircle, LogIn, ArrowRight } from "lucide-react"
 
 interface DashboardData {
   events_count: number
@@ -132,7 +133,12 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Dashboard — {selectedClub.club_name}</h1>
+      <div className="space-y-1">
+        <h1 className="text-2xl font-bold">Dashboard — {selectedClub.club_name}</h1>
+        <p className="max-w-2xl text-sm text-muted-foreground">
+          Vue d&apos;ensemble des notifications de votre organisation : ce qui est configuré et ce qui a été envoyé.
+        </p>
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -167,7 +173,10 @@ export default function AdminDashboardPage() {
           <CardContent>
             <div className="text-3xl font-bold">{data?.workflows_count || 0}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              sur {data?.events_count || 0} événements disponibles
+              sur{" "}
+              <Link href="/admin/events" className="underline underline-offset-2 hover:text-foreground">
+                {data?.events_count || 0} événements disponibles
+              </Link>
             </p>
           </CardContent>
         </Card>
@@ -205,21 +214,76 @@ export default function AdminDashboardPage() {
         </Card>
       </div>
 
-      {/* Quick actions */}
-      {data?.channels_count === 0 && (
-        <Card className="border-dashed">
-          <CardContent className="py-8 text-center">
-            <Radio className="h-10 w-10 mx-auto text-muted-foreground mb-4" />
-            <h3 className="font-semibold mb-2">Commencez par configurer un canal</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Ajoutez un webhook Discord ou une adresse email pour recevoir vos notifications.
-            </p>
-            <Button asChild>
-              <Link href="/admin/channels">Configurer un canal</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      {/* Comment ça marche */}
+      <Card>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base">Comment ça marche</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Vos applications Quatools (BAAS, Cours…) émettent des événements. Vous décidez lesquels
+            déclenchent un message, vers où, et avec quel contenu.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <FlowDiagram />
+          <div className="grid gap-2 sm:grid-cols-3">
+            <OnboardingStep
+              num={1}
+              done={(data?.channels_count || 0) > 0}
+              title="Créez un canal"
+              detail="Webhook Discord ou email : la destination des messages."
+              href="/admin/channels"
+              linkLabel="Gérer les canaux"
+            />
+            <OnboardingStep
+              num={2}
+              done={(data?.workflows_count || 0) > 0}
+              title="Créez un workflow"
+              detail="Choisissez un événement, un canal et rédigez le message."
+              href="/admin/workflows"
+              linkLabel="Gérer les workflows"
+            />
+            <OnboardingStep
+              num={3}
+              done={(data?.recent_logs?.length || 0) > 0}
+              title="Les envois partent seuls"
+              detail="Dès qu'un événement survient, le message est envoyé et tracé."
+              href="/admin/logs"
+              linkLabel="Voir l'historique"
+            />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function OnboardingStep({ num, done, title, detail, href, linkLabel }: {
+  num: number
+  done: boolean
+  title: string
+  detail: string
+  href: string
+  linkLabel: string
+}) {
+  return (
+    <div className={`rounded-lg border p-3 ${done ? "bg-muted/40" : ""}`}>
+      <div className="flex items-center gap-2 mb-1">
+        {done ? (
+          <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+        ) : (
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-xs font-semibold text-muted-foreground">
+            {num}
+          </span>
+        )}
+        <span className={`text-sm font-semibold ${done ? "text-muted-foreground" : ""}`}>{title}</span>
+      </div>
+      <p className="text-xs text-muted-foreground leading-relaxed mb-2">{detail}</p>
+      <Button variant="link" size="sm" className="h-auto px-0 text-xs" asChild>
+        <Link href={href}>
+          {linkLabel}
+          <ArrowRight className="h-3 w-3 ml-1" />
+        </Link>
+      </Button>
     </div>
   )
 }

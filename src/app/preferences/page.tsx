@@ -20,6 +20,14 @@ interface WorkflowOptout {
   is_opted_out: boolean
 }
 
+const CATEGORY_LABELS: Record<string, string> = {
+  billing: "Facturation",
+  member: "Membres",
+  team: "Équipes",
+  shop: "Boutique & préventes",
+  system: "Système",
+}
+
 function PreferencesContent() {
   const { selectedClub, loading: clubLoading, isAuthenticated } = useClub()
   const orgId = selectedClub?.club_id || null
@@ -82,7 +90,7 @@ function PreferencesContent() {
   const categories = useMemo(() => {
     const map = new Map<string, WorkflowOptout[]>()
     for (const wf of workflows) {
-      const cat = wf.event_category || "Autre"
+      const cat = CATEGORY_LABELS[wf.event_category] || wf.event_category || "Autre"
       if (!map.has(cat)) map.set(cat, [])
       map.get(cat)!.push(wf)
     }

@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { PageHeader } from "@/components/page-header"
 import { useClub } from "@/lib/contexts/club-context"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -57,6 +58,14 @@ interface WorkflowItem {
 interface EventWithWorkflows {
   event: Event
   workflows: WorkflowItem[]
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  billing: "Facturation",
+  member: "Membres",
+  team: "Équipes",
+  shop: "Boutique & préventes",
+  system: "Système",
 }
 
 function WorkflowsContent() {
@@ -114,7 +123,7 @@ function WorkflowsContent() {
   const categories = useMemo(() => {
     const map = new Map<string, EventWithWorkflows[]>()
     for (const item of eventsWithWorkflows) {
-      const cat = item.event.category || "Autre"
+      const cat = CATEGORY_LABELS[item.event.category] || item.event.category || "Autre"
       if (!map.has(cat)) map.set(cat, [])
       map.get(cat)!.push(item)
     }
@@ -313,7 +322,11 @@ function WorkflowsContent() {
   if (channels.length === 0) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Workflows</h1>
+        <PageHeader
+          title="Workflows"
+          description="Un workflow relie un événement à un canal avec un message personnalisé : « quand X se produit, envoyer ce message sur Y ». C'est ici que tout se décide."
+          flowStep="workflow"
+        />
         <Card className="border-dashed">
           <CardContent className="py-12 text-center">
             <AlertCircle className="h-10 w-10 mx-auto text-muted-foreground mb-4" />
@@ -339,7 +352,11 @@ function WorkflowsContent() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Workflows</h1>
+      <PageHeader
+        title="Workflows"
+        description="Un workflow relie un événement à un canal avec un message personnalisé : « quand X se produit, envoyer ce message sur Y ». Chaque événement peut avoir plusieurs workflows."
+        flowStep="workflow"
+      />
 
       {categories.map(([category, items]) => (
         <div key={category}>
