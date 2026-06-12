@@ -1,4 +1,5 @@
 import type { NotificationEvent } from '@/lib/types/notifications'
+import type { SenderIdentity } from '@/lib/notifications/sender'
 import { dispatchDiscordWebhook } from './discord-webhook'
 import { dispatchEmail } from './email'
 
@@ -16,6 +17,8 @@ export interface DispatchParams {
     body: string
     format: 'text' | 'html' | 'markdown'
   }
+  /** Identité d'expéditeur de l'organisation (marque blanche) */
+  sender?: SenderIdentity
 }
 
 type DispatchFn = (params: DispatchParams) => Promise<DispatchResult>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminAuthForWorkflow } from '@/lib/auth/admin'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getDispatcher } from '@/lib/dispatchers'
+import { getSenderIdentity } from '@/lib/notifications/sender'
 import type { NotificationEvent } from '@/lib/types/notifications'
 
 /**
@@ -86,6 +87,8 @@ export async function POST(
     return NextResponse.json({ error: `Dispatcher non trouvé pour le type: ${channel.type}` }, { status: 400 })
   }
 
+  const sender = await getSenderIdentity(workflow.org_id)
+
   const result = await dispatcher({
     config: channel.config,
     event,
@@ -95,6 +98,7 @@ export async function POST(
       body: step.body,
       format: step.format,
     },
+    sender,
   })
 
   return NextResponse.json({

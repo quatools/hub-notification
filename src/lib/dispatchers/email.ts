@@ -29,8 +29,33 @@ function getTransporter(): Transporter | null {
   return transporter
 }
 
+const DEFAULT_FROM = 'Quatools Notifications <notifications@quatools.fr>'
+
+/** Extrait l'adresse seule d'un From au format `Nom <adresse>` ou `adresse`. */
+function extractAddress(from: string): string {
+  const match = from.match(/<([^>]+)>/)
+  return match ? match[1] : from.trim()
+}
+
+/**
+ * Construit le From en marque blanche :
+ * - domaine d'org vérifié (niveau 2) : "Nom" <notifications@domaine-org>
+ * - sinon nom d'org (niveau 1)       : "Nom" <adresse par défaut>
+ * - sinon                            : SMTP_FROM tel quel
+ */
+function buildFrom(sender?: DispatchParams['sender']): string {
+  const defaultFrom = process.env.SMTP_FROM || DEFAULT_FROM
+  if (!sender) return defaultFrom
+
+  const address = sender.fromEmail || extractAddress(defaultFrom)
+  if (sender.name) {
+    return `"${sender.name.replace(/"/g, "'")}" <${address}>`
+  }
+  return sender.fromEmail ? address : defaultFrom
+}
+
 export async function dispatchEmail(params: DispatchParams): Promise<DispatchResult> {
-  const { config, event, payload, step } = params
+  const { config, event, payload, step, sender } = params
 
   const email = config.email as string
   if (!email) {
@@ -56,10 +81,11 @@ export async function dispatchEmail(params: DispatchParams): Promise<DispatchRes
 
   try {
     await smtp.sendMail({
-      from: process.env.SMTP_FROM || 'Quatools Notifications <notifications@quatools.fr>',
+      from: buildFrom(sender),
       to: email,
       subject,
       html,
+      ...(sender?.replyTo && { replyTo: sender.replyTo }),
     })
 
     return { success: true }

@@ -15,7 +15,7 @@ function getCategoryColor(category: string): number {
 }
 
 export async function dispatchDiscordWebhook(params: DispatchParams): Promise<DispatchResult> {
-  const { config, event, payload, step } = params
+  const { config, event, payload, step, sender } = params
 
   const webhookUrl = config.webhook_url as string
   if (!webhookUrl) {
@@ -35,14 +35,15 @@ export async function dispatchDiscordWebhook(params: DispatchParams): Promise<Di
     ? renderTemplate(step.body, payload)
     : `Événement: ${event.label}`
 
-  // Construire l'embed
+  // Construire l'embed (username = nom de l'org si configuré, marque blanche)
   const body = {
+    ...(sender?.name && { username: sender.name }),
     embeds: [
       {
         title: event.label,
         description,
         color: getCategoryColor(event.category),
-        footer: { text: 'Quatools Notifications' },
+        footer: { text: sender?.name || 'Quatools Notifications' },
         timestamp: new Date().toISOString(),
       },
     ],

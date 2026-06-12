@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useClub } from "@/lib/contexts/club-context"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Bell, LayoutDashboard, Zap, Radio, Workflow, ScrollText, BellOff, Mail } from "lucide-react"
+import { Bell, LayoutDashboard, Zap, Radio, Workflow, ScrollText, BellOff, Mail, Settings } from "lucide-react"
 
 export function Navbar() {
   const pathname = usePathname()
@@ -20,6 +20,7 @@ export function Navbar() {
     { href: "/admin/workflows", label: "Workflows", icon: Workflow },
     { href: "/admin/channels", label: "Canaux", icon: Radio },
     { href: "/admin/logs", label: "Historique", icon: ScrollText },
+    { href: "/admin/settings", label: "Paramètres", icon: Settings },
   ]
 
   const userItems = [

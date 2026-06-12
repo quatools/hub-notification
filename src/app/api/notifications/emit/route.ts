@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateApiKey } from '@/lib/auth/api-key'
 import { createServiceClient } from '@/lib/supabase/server'
 import { resolveRoutes } from '@/lib/notifications/routing'
+import { getSenderIdentity } from '@/lib/notifications/sender'
 import { getDispatcher } from '@/lib/dispatchers'
 import type { EmitRequest, EmitResponse, NotificationEvent } from '@/lib/types/notifications'
 
@@ -63,7 +64,10 @@ export async function POST(request: NextRequest) {
     } satisfies EmitResponse)
   }
 
-  // 6. Dispatcher en parallèle avec logging dans workflow_executions
+  // 6. Identité d'expéditeur de l'org (marque blanche)
+  const sender = await getSenderIdentity(body.org_id)
+
+  // 7. Dispatcher en parallèle avec logging dans workflow_executions
   const executionIds: string[] = []
   const channelTypes = new Set<string>()
 
@@ -111,6 +115,7 @@ export async function POST(request: NextRequest) {
       event: notifEvent,
       payload: body.payload,
       step: route.step,
+      sender,
     })
 
     // Mettre à jour l'exécution
