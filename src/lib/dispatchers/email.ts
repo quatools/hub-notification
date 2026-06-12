@@ -77,7 +77,15 @@ export async function dispatchEmail(params: DispatchParams): Promise<DispatchRes
     ? renderTemplate(step.body, payload)
     : `<p>${event.label}</p><p>${event.description || ''}</p>`
 
-  const html = wrapEmailLayout(bodyContent, event.label)
+  // Un document HTML complet (rédigé par l'admin ou généré par IA) est envoyé
+  // tel quel ; un fragment simple est habillé du layout brandé.
+  const isFullDocument = /<!DOCTYPE|<html[\s>]/i.test(bodyContent)
+  const html = isFullDocument
+    ? bodyContent
+    : wrapEmailLayout(bodyContent, event.label, {
+        senderName: sender?.name,
+        category: event.category,
+      })
 
   try {
     await smtp.sendMail({

@@ -113,6 +113,8 @@ export function MessagePreview({
   }
 
   // Email
+  const isFullDocument = /<!DOCTYPE|<html[\s>]/i.test(renderedBody)
+
   return (
     <div className="space-y-1.5">
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -130,25 +132,35 @@ export function MessagePreview({
             <span className="font-semibold">{renderedSubject || "—"}</span>
           </p>
         </div>
-        <div className="px-4 py-4">
-          {renderedBody ? (
-            format === "html" ? (
-              <div
-                className="text-sm [&_h1]:text-lg [&_h1]:font-bold [&_h1]:my-2 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:my-2 [&_p]:my-1.5 [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5"
-                dangerouslySetInnerHTML={{ __html: renderedBody }}
-              />
+        {isFullDocument ? (
+          // Document HTML complet : rendu isolé tel quel, sans habillage
+          <iframe
+            title="Aperçu email"
+            sandbox=""
+            srcDoc={renderedBody}
+            className="h-96 w-full border-0 bg-white"
+          />
+        ) : (
+          <div className="px-4 py-4">
+            {renderedBody ? (
+              format === "html" ? (
+                <div
+                  className="text-sm [&_h1]:text-lg [&_h1]:font-bold [&_h1]:my-2 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:my-2 [&_p]:my-1.5 [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5"
+                  dangerouslySetInnerHTML={{ __html: renderedBody }}
+                />
+              ) : (
+                <p className="whitespace-pre-wrap text-sm">{renderedBody}</p>
+              )
             ) : (
-              <p className="whitespace-pre-wrap text-sm">{renderedBody}</p>
-            )
-          ) : (
-            <p className="text-sm text-muted-foreground/60">Votre message apparaîtra ici…</p>
-          )}
-          <div className="mt-4 border-t pt-2">
-            <p className="text-[11px] text-muted-foreground">
-              Envoyé par {displayName} via Quatools Notifications
-            </p>
+              <p className="text-sm text-muted-foreground/60">Votre message apparaîtra ici…</p>
+            )}
+            <div className="mt-4 border-t pt-2">
+              <p className="text-[11px] text-muted-foreground">
+                Envoyé par {displayName} · habillage automatique appliqué à l&apos;envoi
+              </p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )

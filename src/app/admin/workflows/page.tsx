@@ -704,6 +704,12 @@ function WorkflowsContent() {
                     <SelectItem value="html">HTML</SelectItem>
                   </SelectContent>
                 </Select>
+                {createFormat === "html" && (
+                  <p className="text-xs text-muted-foreground">
+                    Fragment HTML simple → habillage automatique aux couleurs de votre organisation.
+                    Document complet (<code className="rounded bg-muted px-1">&lt;!DOCTYPE…&gt;</code>) → envoyé tel quel, contrôle total.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -820,6 +826,12 @@ function WorkflowsContent() {
                     <SelectItem value="html">HTML</SelectItem>
                   </SelectContent>
                 </Select>
+                {editFormat === "html" && (
+                  <p className="text-xs text-muted-foreground">
+                    Fragment HTML simple → habillage automatique aux couleurs de votre organisation.
+                    Document complet (<code className="rounded bg-muted px-1">&lt;!DOCTYPE…&gt;</code>) → envoyé tel quel, contrôle total.
+                  </p>
+                )}
               </div>
 
               {/* Envoi de test */}
