@@ -2,15 +2,15 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { PageHeader } from "@/components/page-header"
+import { SendingDomainCard } from "@/components/sending-domain-card"
 import { useClub } from "@/lib/contexts/club-context"
 import { toast } from "sonner"
-import { Loader2, Mail, MessageSquare, Globe, Sparkles } from "lucide-react"
+import { Loader2, Mail, MessageSquare, Sparkles } from "lucide-react"
 
 interface OrgSettings {
   sender_name: string | null
@@ -26,7 +26,6 @@ export default function AdminSettingsPage() {
   const [saving, setSaving] = useState(false)
   const [senderName, setSenderName] = useState("")
   const [replyTo, setReplyTo] = useState("")
-  const [domainStatus, setDomainStatus] = useState("unconfigured")
 
   const fetchSettings = useCallback(async () => {
     if (!orgId) { setLoading(false); return }
@@ -37,7 +36,6 @@ export default function AdminSettingsPage() {
       const s: OrgSettings = data.settings
       setSenderName(s.sender_name || "")
       setReplyTo(s.reply_to || "")
-      setDomainStatus(s.domain_status || "unconfigured")
     } catch {
       toast.error("Erreur lors du chargement des paramètres")
     } finally {
@@ -149,26 +147,7 @@ export default function AdminSettingsPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-dashed">
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Globe className="h-4 w-4 text-muted-foreground" />
-            Domaine d&apos;envoi personnalisé
-            <Badge variant="secondary" className="text-xs">Bientôt disponible</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Envoyez vos emails directement depuis votre propre domaine
-            (ex: <code className="rounded bg-muted px-1.5 py-0.5 text-xs">notifications@monclub.fr</code>).
-            Vous ajouterez votre domaine ici, poserez deux enregistrements DNS, et tous vos emails
-            partiront sous votre marque, sans aucune mention de Quatools.
-            {domainStatus !== "unconfigured" && (
-              <span className="block mt-2">Statut actuel : {domainStatus}</span>
-            )}
-          </p>
-        </CardContent>
-      </Card>
+      <SendingDomainCard orgId={selectedClub.club_id} />
     </div>
   )
 }

@@ -31,6 +31,9 @@ function generateTestPayload(schema: Record<string, string> | null): Record<stri
 }
 
 // POST /api/admin/workflows/:id/test
+// Body optionnel : { payload?: Record<string, unknown>, override_email?: string }
+// - payload : valeurs de test fournies par l'admin (sinon générées du schéma)
+// - override_email : envoyer le test à cette adresse plutôt qu'au canal (email uniquement)
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -39,6 +42,17 @@ export async function POST(
   const auth = await getAdminAuthForWorkflow(id)
   if (!auth) {
     return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+  }
+
+  let options: {
+    payload?: Record<string, unknown>
+    override_email?: string
+    step?: { subject?: string | null; body?: string; format?: string }
+  } = {}
+  try {
+    options = await request.json()
+  } catch {
+    // Pas de body : comportement par défaut
   }
 
   const supabase = createServiceClient()
@@ -78,8 +92,24 @@ export async function POST(
     return NextResponse.json({ error: 'Canal inactif ou non vérifié' }, { status: 400 })
   }
 
-  // Générer le payload de test
-  const testPayload = generateTestPayload(event.payload_schema)
+  // Payload de test : valeurs fournies par l'admin, complétées par les valeurs générées
+  const generated = generateTestPayload(event.payload_schema)
+  const testPayload = { ...generated, ...(options.payload || {}) }
+
+  // Destination override (email uniquement)
+  let config = channel.config
+  if (options.override_email) {
+    if (channel.type !== 'email') {
+      return NextResponse.json(
+        { error: "L'adresse de test ne s'applique qu'aux canaux email" },
+        { status: 400 }
+      )
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(options.override_email)) {
+      return NextResponse.json({ error: 'Adresse email de test invalide' }, { status: 400 })
+    }
+    config = { ...channel.config, email: options.override_email }
+  }
 
   // Dispatcher
   const dispatcher = getDispatcher(channel.type)
@@ -89,14 +119,15 @@ export async function POST(
 
   const sender = await getSenderIdentity(workflow.org_id)
 
+  // L'admin peut tester le contenu en cours d'édition (non sauvegardé)
   const result = await dispatcher({
-    config: channel.config,
+    config,
     event,
     payload: testPayload,
     step: {
-      subject: step.subject,
-      body: step.body,
-      format: step.format,
+      subject: options.step?.subject !== undefined ? options.step.subject : step.subject,
+      body: options.step?.body || step.body,
+      format: (options.step?.format || step.format) as 'text' | 'html' | 'markdown',
     },
     sender,
   })

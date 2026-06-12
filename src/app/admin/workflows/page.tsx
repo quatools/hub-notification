@@ -14,12 +14,14 @@ import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { PageHeader } from "@/components/page-header"
+import { MessagePreview } from "@/components/message-preview"
+import { DEFAULT_TEMPLATES } from "@/lib/notifications/default-templates"
 import { useClub } from "@/lib/contexts/club-context"
 import { toast } from "sonner"
 import Link from "next/link"
 import {
   Plus, Radio, Mail, Trash2, Pencil, Send, ChevronDown, ChevronRight,
-  Loader2, Workflow as WorkflowIcon, AlertCircle
+  Loader2, Workflow as WorkflowIcon, AlertCircle, RotateCcw
 } from "lucide-react"
 
 interface Event {
@@ -93,15 +95,26 @@ function WorkflowsContent() {
   const [editFormat, setEditFormat] = useState("text")
   const [saving, setSaving] = useState(false)
 
+  // Valeurs de test (preview + envoi de test)
+  const [createValues, setCreateValues] = useState<Record<string, string>>({})
+  const [editValues, setEditValues] = useState<Record<string, string>>({})
+  const [editTestEmail, setEditTestEmail] = useState("")
+  const [sendingTest, setSendingTest] = useState(false)
+
+  // Identité marque blanche (pour l'aperçu)
+  const [senderName, setSenderName] = useState<string | null>(null)
+  const [fromEmail, setFromEmail] = useState("notifications@hub.quatools.fr")
+
   // Test
   const [testing, setTesting] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     if (!orgId) { setLoading(false); return }
     try {
-      const [wfRes, chRes] = await Promise.all([
+      const [wfRes, chRes, settingsRes] = await Promise.all([
         fetch(`/api/admin/workflows?org_id=${orgId}`),
         fetch(`/api/admin/channels?org_id=${orgId}`),
+        fetch(`/api/admin/settings?org_id=${orgId}`),
       ])
       if (!wfRes.ok || !chRes.ok) throw new Error()
 
@@ -110,6 +123,15 @@ function WorkflowsContent() {
 
       setEventsWithWorkflows(wfData.events_with_workflows || [])
       setChannels(chData.channels || [])
+
+      if (settingsRes.ok) {
+        const settingsData = await settingsRes.json()
+        const s = settingsData.settings
+        setSenderName(s?.sender_name || null)
+        if (s?.domain_status === "verified" && s?.sender_domain) {
+          setFromEmail(`notifications@${s.sender_domain}`)
+        }
+      }
     } catch {
       toast.error("Erreur lors du chargement")
     } finally {
@@ -153,12 +175,34 @@ function WorkflowsContent() {
   }
 
   // Extract variables from payload_schema
+  // Le schéma est stocké à plat ({"member_name":"string"}) ; on garde le
+  // fallback "properties" pour d'éventuels schémas au format JSON Schema.
   const getVariables = (event: Event): string[] => {
     if (!event.payload_schema) return []
-    const props = (event.payload_schema as { properties?: Record<string, unknown> }).properties
-    if (!props) return []
-    return Object.keys(props)
+    const schema = event.payload_schema as { properties?: Record<string, unknown> }
+    if (schema.properties) return Object.keys(schema.properties)
+    return Object.keys(event.payload_schema)
   }
+
+  // Valeurs d'exemple par défaut pour les variables (preview + test)
+  const buildSampleValues = (event: Event): Record<string, string> => {
+    const values: Record<string, string> = {}
+    const schema = (event.payload_schema || {}) as Record<string, unknown>
+    for (const key of getVariables(event)) {
+      const type = schema[key]
+      if (key.includes("email")) values[key] = "jean.dupont@exemple.fr"
+      else if (key.includes("name") && !key.includes("plan")) values[key] = "Jean Dupont"
+      else if (key.includes("url")) values[key] = "https://exemple.fr/suivi"
+      else if (type === "number") values[key] = "49.99"
+      else if (type === "boolean") values[key] = "oui"
+      else values[key] = `Exemple ${key.replace(/_/g, " ")}`
+    }
+    return values
+  }
+
+  // Template par défaut proposé pour un couple événement + type de canal
+  const getDefaultTemplate = (eventSlug: string, channelType: string) =>
+    DEFAULT_TEMPLATES[eventSlug]?.[channelType] || null
 
   // Open create dialog with pre-filled data
   const openCreate = (eventId: string) => {
@@ -168,7 +212,24 @@ function WorkflowsContent() {
     setCreateSubject("")
     setCreateBody("")
     setCreateFormat(eventData?.event.supported_channels?.includes("email") ? "html" : "text")
+    setCreateValues(eventData ? buildSampleValues(eventData.event) : {})
     setCreateOpen(true)
+  }
+
+  // Pré-remplit l'éditeur avec le template par défaut de l'événement pour ce canal
+  const applyDefaultTemplate = (eventSlug: string, channelType: string, target: "create" | "edit") => {
+    const tpl = getDefaultTemplate(eventSlug, channelType)
+    if (!tpl) return false
+    if (target === "create") {
+      setCreateSubject(tpl.subject || "")
+      setCreateBody(tpl.body)
+      setCreateFormat(tpl.format)
+    } else {
+      setEditSubject(tpl.subject || "")
+      setEditBody(tpl.body)
+      setEditFormat(tpl.format)
+    }
+    return true
   }
 
   const handleCreate = async () => {
@@ -209,7 +270,41 @@ function WorkflowsContent() {
     setEditSubject(workflow.step?.subject || "")
     setEditBody(workflow.step?.body || "")
     setEditFormat(workflow.step?.format || "text")
+    const ev = eventsWithWorkflows.find((ewf) => ewf.workflows.some((w) => w.id === workflow.id))?.event
+    setEditValues(ev ? buildSampleValues(ev) : {})
+    setEditTestEmail("")
     setEditOpen(true)
+  }
+
+  // Envoi de test depuis l'éditeur : valeurs custom + destination email optionnelle
+  const handleSendTestFromEdit = async () => {
+    if (!editWorkflow) return
+    setSendingTest(true)
+    try {
+      const res = await fetch(`/api/admin/workflows/${editWorkflow.id}/test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          payload: editValues,
+          step: { subject: editSubject || null, body: editBody, format: editFormat },
+          ...(editTestEmail.trim() && { override_email: editTestEmail.trim() }),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        toast.error(data.error || "Erreur lors de l'envoi du test")
+        return
+      }
+      toast.success(
+        editTestEmail.trim()
+          ? `Test envoyé à ${editTestEmail.trim()}`
+          : "Notification de test envoyée sur le canal du workflow"
+      )
+    } catch {
+      toast.error("Erreur lors de l'envoi du test")
+    } finally {
+      setSendingTest(false)
+    }
   }
 
   const handleSaveEdit = async () => {
@@ -497,91 +592,141 @@ function WorkflowsContent() {
 
       {/* Create workflow dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Nouvelle route</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            {createEvent && (
-              <div className="p-3 bg-muted/50 rounded-md">
-                <p className="text-sm font-medium">{createEvent.label}</p>
-                <p className="text-xs text-muted-foreground">{createEvent.slug}</p>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label>Canal de destination</Label>
-              <Select
-                value={createChannelId}
-                onValueChange={(val) => {
-                  setCreateChannelId(val)
-                  const ch = channels.find((c) => c.id === val)
-                  if (ch) setCreateFormat(getDefaultFormat(ch.type))
-                }}
-              >
-                <SelectTrigger><SelectValue placeholder="Choisir un canal" /></SelectTrigger>
-                <SelectContent>
-                  {createCompatibleChannels.map((ch) => (
-                    <SelectItem key={ch.id} value={ch.id}>
-                      <span className="flex items-center gap-2">
-                        {ch.type === "discord_webhook" ? "Discord" : "Email"} — {ch.label || ch.id.slice(0, 8)}
-                      </span>
-                    </SelectItem>
-                  ))}
-                  {createCompatibleChannels.length === 0 && (
-                    <SelectItem value="none" disabled>
-                      Aucun canal compatible
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {createFormat === "html" && (
-              <div className="space-y-2">
-                <Label>Sujet (email)</Label>
-                <Input
-                  placeholder="ex: Nouvelle inscription - {{member_name}}"
-                  value={createSubject}
-                  onChange={(e) => setCreateSubject(e.target.value)}
-                />
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label>Message</Label>
-              <Textarea
-                className="min-h-[120px] font-mono text-sm"
-                placeholder="Écrivez votre message ici..."
-                value={createBody}
-                onChange={(e) => setCreateBody(e.target.value)}
-              />
-              {createEvent && getVariables(createEvent).length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1">
-                  <span className="text-xs text-muted-foreground mr-1">Variables :</span>
-                  {getVariables(createEvent).map((v) => (
-                    <button
-                      key={v}
-                      className="text-xs px-1.5 py-0.5 rounded bg-muted hover:bg-muted/80 font-mono transition-colors"
-                      onClick={() => setCreateBody((prev) => prev + `{{${v}}}`)}
-                    >
-                      {`{{${v}}}`}
-                    </button>
-                  ))}
+          <div className="grid gap-6 py-2 md:grid-cols-2">
+            {/* Colonne édition */}
+            <div className="space-y-4">
+              {createEvent && (
+                <div className="p-3 bg-muted/50 rounded-md">
+                  <p className="text-sm font-medium">{createEvent.label}</p>
+                  <p className="text-xs text-muted-foreground">{createEvent.slug}</p>
                 </div>
               )}
+
+              <div className="space-y-2">
+                <Label>Canal de destination</Label>
+                <Select
+                  value={createChannelId}
+                  onValueChange={(val) => {
+                    setCreateChannelId(val)
+                    const ch = channels.find((c) => c.id === val)
+                    if (ch) {
+                      // Proposer le template par défaut si l'éditeur est vide
+                      const applied = !createBody.trim() && createEvent
+                        ? applyDefaultTemplate(createEvent.slug, ch.type, "create")
+                        : false
+                      if (!applied) setCreateFormat(getDefaultFormat(ch.type))
+                    }
+                  }}
+                >
+                  <SelectTrigger><SelectValue placeholder="Choisir un canal" /></SelectTrigger>
+                  <SelectContent>
+                    {createCompatibleChannels.map((ch) => (
+                      <SelectItem key={ch.id} value={ch.id}>
+                        <span className="flex items-center gap-2">
+                          {ch.type === "discord_webhook" ? "Discord" : "Email"} — {ch.label || ch.id.slice(0, 8)}
+                        </span>
+                      </SelectItem>
+                    ))}
+                    {createCompatibleChannels.length === 0 && (
+                      <SelectItem value="none" disabled>
+                        Aucun canal compatible
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {createFormat === "html" && (
+                <div className="space-y-2">
+                  <Label>Sujet (email)</Label>
+                  <Input
+                    placeholder="ex: Nouvelle inscription - {{member_name}}"
+                    value={createSubject}
+                    onChange={(e) => setCreateSubject(e.target.value)}
+                  />
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Message</Label>
+                  {createEvent && createChannelId && getDefaultTemplate(
+                    createEvent.slug,
+                    channels.find((c) => c.id === createChannelId)?.type || ""
+                  ) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto px-1.5 py-0.5 text-xs text-muted-foreground"
+                      onClick={() => {
+                        const ch = channels.find((c) => c.id === createChannelId)
+                        if (ch && createEvent) applyDefaultTemplate(createEvent.slug, ch.type, "create")
+                      }}
+                    >
+                      <RotateCcw className="h-3 w-3 mr-1" />
+                      Remettre par défaut
+                    </Button>
+                  )}
+                </div>
+                <Textarea
+                  className="min-h-[120px] font-mono text-sm"
+                  placeholder="Écrivez votre message ici..."
+                  value={createBody}
+                  onChange={(e) => setCreateBody(e.target.value)}
+                />
+                {createEvent && getVariables(createEvent).length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    <span className="text-xs text-muted-foreground mr-1">Variables (cliquez pour insérer) :</span>
+                    {getVariables(createEvent).map((v) => (
+                      <button
+                        key={v}
+                        className="text-xs px-1.5 py-0.5 rounded bg-muted hover:bg-muted/80 font-mono transition-colors"
+                        onClick={() => setCreateBody((prev) => prev + `{{${v}}}`)}
+                      >
+                        {`{{${v}}}`}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Format</Label>
+                <Select value={createFormat} onValueChange={setCreateFormat}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="text">Texte brut</SelectItem>
+                    <SelectItem value="markdown">Markdown</SelectItem>
+                    <SelectItem value="html">HTML</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Format</Label>
-              <Select value={createFormat} onValueChange={setCreateFormat}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="text">Texte brut</SelectItem>
-                  <SelectItem value="markdown">Markdown</SelectItem>
-                  <SelectItem value="html">HTML</SelectItem>
-                </SelectContent>
-              </Select>
+            {/* Colonne aperçu */}
+            <div className="space-y-4">
+              <MessagePreview
+                channelType={channels.find((c) => c.id === createChannelId)?.type || null}
+                format={createFormat}
+                subject={createSubject}
+                body={createBody}
+                values={createValues}
+                eventLabel={createEvent?.label || ""}
+                eventCategory={createEvent?.category || "system"}
+                senderName={senderName}
+                fromEmail={fromEmail}
+              />
+              {createEvent && getVariables(createEvent).length > 0 && (
+                <TestDataFields
+                  variables={getVariables(createEvent)}
+                  values={createValues}
+                  onChange={setCreateValues}
+                />
+              )}
             </div>
           </div>
           <DialogFooter>
@@ -601,61 +746,134 @@ function WorkflowsContent() {
 
       {/* Edit workflow dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Modifier le message</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            {editWorkflow?.channel && (
-              <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
-                {getChannelIcon(editWorkflow.channel.type)}
-                <span className="text-sm font-medium">{getChannelLabel(editWorkflow.channel)}</span>
-              </div>
-            )}
-
-            {editFormat === "html" && (
-              <div className="space-y-2">
-                <Label>Sujet (email)</Label>
-                <Input
-                  value={editSubject}
-                  onChange={(e) => setEditSubject(e.target.value)}
-                />
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label>Message</Label>
-              <Textarea
-                className="min-h-[150px] font-mono text-sm"
-                value={editBody}
-                onChange={(e) => setEditBody(e.target.value)}
-              />
-              {editEvent && getVariables(editEvent).length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1">
-                  <span className="text-xs text-muted-foreground mr-1">Variables :</span>
-                  {getVariables(editEvent).map((v) => (
-                    <button
-                      key={v}
-                      className="text-xs px-1.5 py-0.5 rounded bg-muted hover:bg-muted/80 font-mono transition-colors"
-                      onClick={() => setEditBody((prev) => prev + `{{${v}}}`)}
-                    >
-                      {`{{${v}}}`}
-                    </button>
-                  ))}
+          <div className="grid gap-6 py-2 md:grid-cols-2">
+            {/* Colonne édition */}
+            <div className="space-y-4">
+              {editWorkflow?.channel && (
+                <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
+                  {getChannelIcon(editWorkflow.channel.type)}
+                  <span className="text-sm font-medium">{getChannelLabel(editWorkflow.channel)}</span>
                 </div>
               )}
+
+              {editFormat === "html" && (
+                <div className="space-y-2">
+                  <Label>Sujet (email)</Label>
+                  <Input
+                    value={editSubject}
+                    onChange={(e) => setEditSubject(e.target.value)}
+                  />
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Message</Label>
+                  {editEvent && editWorkflow?.channel && getDefaultTemplate(editEvent.slug, editWorkflow.channel.type) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto px-1.5 py-0.5 text-xs text-muted-foreground"
+                      onClick={() => {
+                        if (editEvent && editWorkflow?.channel) {
+                          applyDefaultTemplate(editEvent.slug, editWorkflow.channel.type, "edit")
+                        }
+                      }}
+                    >
+                      <RotateCcw className="h-3 w-3 mr-1" />
+                      Remettre par défaut
+                    </Button>
+                  )}
+                </div>
+                <Textarea
+                  className="min-h-[150px] font-mono text-sm"
+                  value={editBody}
+                  onChange={(e) => setEditBody(e.target.value)}
+                />
+                {editEvent && getVariables(editEvent).length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    <span className="text-xs text-muted-foreground mr-1">Variables (cliquez pour insérer) :</span>
+                    {getVariables(editEvent).map((v) => (
+                      <button
+                        key={v}
+                        className="text-xs px-1.5 py-0.5 rounded bg-muted hover:bg-muted/80 font-mono transition-colors"
+                        onClick={() => setEditBody((prev) => prev + `{{${v}}}`)}
+                      >
+                        {`{{${v}}}`}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Format</Label>
+                <Select value={editFormat} onValueChange={setEditFormat}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="text">Texte brut</SelectItem>
+                    <SelectItem value="markdown">Markdown</SelectItem>
+                    <SelectItem value="html">HTML</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Envoi de test */}
+              <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Envoyer un test (avec les données d&apos;exemple ci-contre)
+                </Label>
+                {editWorkflow?.channel?.type === "email" && (
+                  <Input
+                    type="email"
+                    placeholder="Adresse de test (sinon : canal du workflow)"
+                    value={editTestEmail}
+                    onChange={(e) => setEditTestEmail(e.target.value)}
+                  />
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSendTestFromEdit}
+                  disabled={sendingTest || !editBody.trim()}
+                >
+                  {sendingTest ? (
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  ) : (
+                    <Send className="h-3.5 w-3.5 mr-1.5" />
+                  )}
+                  Envoyer le test
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Le test envoie le message tel qu&apos;affiché dans l&apos;aperçu, même non enregistré.
+                </p>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Format</Label>
-              <Select value={editFormat} onValueChange={setEditFormat}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="text">Texte brut</SelectItem>
-                  <SelectItem value="markdown">Markdown</SelectItem>
-                  <SelectItem value="html">HTML</SelectItem>
-                </SelectContent>
-              </Select>
+            {/* Colonne aperçu */}
+            <div className="space-y-4">
+              <MessagePreview
+                channelType={editWorkflow?.channel?.type || null}
+                format={editFormat}
+                subject={editSubject}
+                body={editBody}
+                values={editValues}
+                eventLabel={editEvent?.label || ""}
+                eventCategory={editEvent?.category || "system"}
+                senderName={senderName}
+                fromEmail={fromEmail}
+              />
+              {editEvent && getVariables(editEvent).length > 0 && (
+                <TestDataFields
+                  variables={getVariables(editEvent)}
+                  values={editValues}
+                  onChange={setEditValues}
+                />
+              )}
             </div>
           </div>
           <DialogFooter>
@@ -669,6 +887,36 @@ function WorkflowsContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+/** Champs de données d'exemple : alimentent l'aperçu et l'envoi de test. */
+function TestDataFields({ variables, values, onChange }: {
+  variables: string[]
+  values: Record<string, string>
+  onChange: (values: Record<string, string>) => void
+}) {
+  return (
+    <div className="space-y-2 rounded-lg border p-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Données d&apos;exemple
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {variables.map((v) => (
+          <div key={v} className="space-y-1">
+            <Label htmlFor={`testdata-${v}`} className="font-mono text-xs text-muted-foreground">
+              {`{{${v}}}`}
+            </Label>
+            <Input
+              id={`testdata-${v}`}
+              className="h-8 text-sm"
+              value={values[v] || ""}
+              onChange={(e) => onChange({ ...values, [v]: e.target.value })}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
