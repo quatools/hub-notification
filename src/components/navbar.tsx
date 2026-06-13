@@ -25,7 +25,8 @@ export function Navbar() {
 
   const userItems = [
     { href: "/preferences", label: "Mes notifications", icon: BellOff, exact: true },
-    { href: "/preferences/channels", label: "Mes canaux", icon: Mail },
+    { href: "/preferences/history", label: "Historique", icon: ScrollText },
+    { href: "/preferences/channels", label: "Mes canaux de réception", icon: Mail },
   ]
 
   const navItems = isAdmin ? adminItems : isUser ? userItems : []

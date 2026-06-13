@@ -112,9 +112,10 @@ function UserChannelsContent() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Mes canaux</h1>
+          <h1 className="text-2xl font-bold">Mes canaux de réception</h1>
           <p className="text-muted-foreground mt-1">
-            Ajoutez des adresses email alternatives pour recevoir vos notifications personnelles.
+            Vos propres adresses pour y rerouter vos notifications. Email pour l&apos;instant ; connexion
+            d&apos;autres comptes (Discord, Google…) à venir.
           </p>
         </div>
         <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) { setNewLabel(""); setNewEmail("") } }}>

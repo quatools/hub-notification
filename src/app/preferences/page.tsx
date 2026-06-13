@@ -194,8 +194,12 @@ function PreferencesContent() {
           <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-md">
             <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
             <p className="text-xs text-muted-foreground">
-              Les canaux de notification (Discord, email) sont gérés par l&apos;administrateur de votre organisation.
-              Vous pouvez uniquement activer ou désactiver la réception de chaque notification.
+              Les canaux (Discord, email) configurés par l&apos;administrateur définissent où vous recevez ces
+              notifications. Ici, vous <strong>activez ou désactivez</strong> chacune. Pour les{" "}
+              <strong>rerouter ou renvoyer vers vos propres adresses</strong>, connectez un canal dans{" "}
+              <Link href="/preferences/channels" className="underline underline-offset-2 hover:text-foreground">
+                «&nbsp;Mes canaux de réception&nbsp;»
+              </Link>.
             </p>
           </div>
         </>
