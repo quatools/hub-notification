@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,7 +13,7 @@ import { DiscordBotCard } from "@/components/discord-bot-card"
 import { McpConnectCard } from "@/components/mcp-connect-card"
 import { useClub } from "@/lib/contexts/club-context"
 import { toast } from "sonner"
-import { Loader2, Mail, MessageSquare, Sparkles } from "lucide-react"
+import { Loader2, Mail, MessageSquare, Sparkles, Building2 } from "lucide-react"
 
 interface OrgSettings {
   sender_name: string | null
@@ -85,6 +86,21 @@ export default function AdminSettingsPage() {
         title="Paramètres"
         description="L'identité sous laquelle vos notifications sont envoyées. Vos membres et clients voient le nom de votre organisation, pas celui de Quatools."
       />
+
+      {/* Organisation active : lève toute ambiguïté sur le club configuré */}
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/40 px-4 py-3">
+        <Building2 className="h-5 w-5 shrink-0 text-muted-foreground" />
+        <div className="min-w-0">
+          <p className="text-xs text-muted-foreground">Vous configurez l&apos;organisation</p>
+          <p className="font-semibold leading-tight">{selectedClub.club_name}</p>
+        </div>
+        {selectedClub.role && (
+          <Badge variant="secondary" className="text-xs capitalize">{selectedClub.role}</Badge>
+        )}
+        <code className="ml-auto rounded bg-background px-2 py-1 text-[11px] text-muted-foreground" title="Identifiant de l'organisation">
+          {selectedClub.club_id}
+        </code>
+      </div>
 
       <Card>
         <CardHeader>

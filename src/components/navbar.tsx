@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useClub } from "@/lib/contexts/club-context"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Bell, LayoutDashboard, Zap, Radio, Workflow, ScrollText, BellOff, Mail, Settings } from "lucide-react"
+import { Bell, LayoutDashboard, Zap, Radio, Workflow, ScrollText, BellOff, Mail, Settings, Building2 } from "lucide-react"
 
 export function Navbar() {
   const pathname = usePathname()
@@ -40,22 +40,26 @@ export function Navbar() {
 
         {/* Club selector */}
         {!loading && clubs.length > 1 && (
-          <Select value={selectedClub?.club_id || ""} onValueChange={selectClub}>
-            <SelectTrigger className="w-[180px] h-8 text-sm">
-              <SelectValue placeholder="Choisir une organisation" />
-            </SelectTrigger>
-            <SelectContent>
-              {clubs.map((club) => (
-                <SelectItem key={club.club_id} value={club.club_id}>
-                  {club.club_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-1.5">
+            <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Select value={selectedClub?.club_id || ""} onValueChange={selectClub}>
+              <SelectTrigger className="w-[180px] h-8 text-sm">
+                <SelectValue placeholder="Choisir une organisation" />
+              </SelectTrigger>
+              <SelectContent>
+                {clubs.map((club) => (
+                  <SelectItem key={club.club_id} value={club.club_id}>
+                    {club.club_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         )}
 
         {!loading && clubs.length === 1 && selectedClub && (
-          <span className="text-sm text-muted-foreground border rounded-md px-2 py-1">
+          <span className="flex items-center gap-1.5 text-sm text-muted-foreground border rounded-md px-2 py-1">
+            <Building2 className="h-4 w-4 shrink-0" />
             {selectedClub.club_name}
           </span>
         )}
