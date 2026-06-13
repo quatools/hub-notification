@@ -40,6 +40,8 @@ export default function AdminChannelsPage() {
   const [formWebhookUrl, setFormWebhookUrl] = useState("")
   const [formEmail, setFormEmail] = useState("")
   const [formDiscordUserId, setFormDiscordUserId] = useState("")
+  // "member" = membre concerné par l'événement (auto), "fixed" = ID précis
+  const [formDmRecipient, setFormDmRecipient] = useState("member")
 
   const isEditing = !!editingChannel
 
@@ -66,6 +68,7 @@ export default function AdminChannelsPage() {
     setFormWebhookUrl("")
     setFormEmail("")
     setFormDiscordUserId("")
+    setFormDmRecipient("member")
   }
 
   const openCreate = () => {
@@ -80,6 +83,7 @@ export default function AdminChannelsPage() {
     setFormWebhookUrl(channel.type === "discord_webhook" ? (channel.config.webhook_url as string) || "" : "")
     setFormEmail(channel.type === "email" ? (channel.config.email as string) || "" : "")
     setFormDiscordUserId(channel.type === "discord_dm" ? (channel.config.discord_user_id as string) || "" : "")
+    setFormDmRecipient(channel.type === "discord_dm" && channel.config.recipient === "member" ? "member" : channel.type === "discord_dm" ? "fixed" : "member")
     setDialogOpen(true)
   }
 
@@ -89,7 +93,8 @@ export default function AdminChannelsPage() {
     try {
       const config: Record<string, unknown> =
         formType === "discord_webhook" ? { webhook_url: formWebhookUrl }
-        : formType === "discord_dm" ? { discord_user_id: formDiscordUserId.trim() }
+        : formType === "discord_dm"
+          ? (formDmRecipient === "member" ? { recipient: "member" } : { discord_user_id: formDiscordUserId.trim() })
         : { email: formEmail }
 
       const url = isEditing ? `/api/admin/channels/${editingChannel.id}` : "/api/admin/channels"
@@ -171,7 +176,9 @@ export default function AdminChannelsPage() {
       const url = channel.config.webhook_url as string
       return url ? `...${url.slice(-20)}` : ""
     }
-    if (channel.type === "discord_dm") return `ID ${channel.config.discord_user_id || ""}`
+    if (channel.type === "discord_dm") {
+      return channel.config.recipient === "member" ? "Membre concerné par l'événement" : `ID ${channel.config.discord_user_id || ""}`
+    }
     if (channel.type === "email") return channel.config.email as string || ""
     return ""
   }
@@ -230,14 +237,37 @@ export default function AdminChannelsPage() {
               </div>
             )}
             {formType === "discord_dm" && (
-              <div className="space-y-2">
-                <Label>ID Discord du destinataire</Label>
-                <Input placeholder="ex: 137245874929861234" value={formDiscordUserId} onChange={(e) => setFormDiscordUserId(e.target.value)} />
+              <>
+                <div className="space-y-2">
+                  <Label>Destinataire</Label>
+                  <Select value={formDmRecipient} onValueChange={setFormDmRecipient} disabled={isEditing}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="member">Le membre concerné par l&apos;événement</SelectItem>
+                      <SelectItem value="fixed">Une personne précise</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {formDmRecipient === "member" && (
+                    <p className="text-xs text-muted-foreground">
+                      Aucun identifiant à saisir : le hub envoie le MP au membre concerné par l&apos;événement,
+                      reconnu automatiquement via son compte Discord. C&apos;est le mode recommandé pour notifier vos membres.
+                    </p>
+                  )}
+                </div>
+                {formDmRecipient === "fixed" && (
+                  <div className="space-y-2">
+                    <Label>ID Discord du destinataire</Label>
+                    <Input placeholder="ex: 137245874929861234" value={formDiscordUserId} onChange={(e) => setFormDiscordUserId(e.target.value)} />
+                    <p className="text-xs text-muted-foreground">
+                      Pour notifier toujours la même personne (capitaine, admin…). Clic droit sur le membre &gt;
+                      « Copier l&apos;identifiant » (mode développeur requis).
+                    </p>
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground">
-                  Clic droit sur le membre &gt; « Copier l&apos;identifiant » (mode développeur requis).
-                  Le bot Notify doit être présent sur votre serveur Discord.
+                  Le bot Notify doit être présent sur votre serveur Discord (voir Paramètres).
                 </p>
-              </div>
+              </>
             )}
             {formType === "email" && (
               <div className="space-y-2">
@@ -253,7 +283,7 @@ export default function AdminChannelsPage() {
               disabled={
                 saving ||
                 (formType === "discord_webhook" ? !formWebhookUrl
-                  : formType === "discord_dm" ? !formDiscordUserId.trim()
+                  : formType === "discord_dm" ? (formDmRecipient === "fixed" && !formDiscordUserId.trim())
                   : !formEmail)
               }
             >

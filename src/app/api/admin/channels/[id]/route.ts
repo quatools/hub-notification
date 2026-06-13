@@ -65,12 +65,17 @@ export async function PUT(
     }
 
     if (channel?.type === 'discord_dm') {
-      const { verifyDiscordUser } = await import('@/lib/dispatchers/discord-dm')
-      const check = await verifyDiscordUser(body.config.discord_user_id as string)
-      if (!check.ok) {
-        return NextResponse.json({ error: check.error }, { status: 400 })
+      if (body.config.recipient === 'member') {
+        updates.config = { recipient: 'member' }
+        updates.is_verified = true
+      } else {
+        const { verifyDiscordUser } = await import('@/lib/dispatchers/discord-dm')
+        const check = await verifyDiscordUser(body.config.discord_user_id as string)
+        if (!check.ok) {
+          return NextResponse.json({ error: check.error }, { status: 400 })
+        }
+        updates.is_verified = true
       }
-      updates.is_verified = true
     }
   }
   const { data, error } = await supabase

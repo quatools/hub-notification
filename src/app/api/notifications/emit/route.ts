@@ -3,6 +3,7 @@ import { validateApiKey } from '@/lib/auth/api-key'
 import { createServiceClient } from '@/lib/supabase/server'
 import { resolveRoutes } from '@/lib/notifications/routing'
 import { getSenderIdentity } from '@/lib/notifications/sender'
+import { resolveDiscordUserId } from '@/lib/notifications/discord-recipient'
 import { getDispatcher } from '@/lib/dispatchers'
 import type { EmitRequest, EmitResponse, NotificationEvent } from '@/lib/types/notifications'
 
@@ -110,8 +111,26 @@ export async function POST(request: NextRequest) {
       return
     }
 
+    // Canal MP "membre concerné" : résoudre l'ID Discord du destinataire (route.user_id)
+    let dispatchConfig = route.channel_config
+    if (route.channel_type === 'discord_dm' && route.channel_config.recipient === 'member') {
+      const discordId = await resolveDiscordUserId(route.user_id)
+      if (!discordId) {
+        await supabase
+          .schema('notifications')
+          .from('workflow_executions')
+          .update({
+            status: 'failed',
+            error_message: 'Aucun compte Discord lié à ce membre (connexion via Discord requise)',
+          })
+          .eq('id', execution.id)
+        return
+      }
+      dispatchConfig = { ...route.channel_config, discord_user_id: discordId }
+    }
+
     const result = await dispatcher({
-      config: route.channel_config,
+      config: dispatchConfig,
       event: notifEvent,
       payload: body.payload,
       step: route.step,

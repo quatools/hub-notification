@@ -9,6 +9,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getDispatcher } from '@/lib/dispatchers'
 import { verifyDiscordUser } from '@/lib/dispatchers/discord-dm'
 import { getSenderIdentity } from '@/lib/notifications/sender'
+import { resolveDiscordUserId } from '@/lib/notifications/discord-recipient'
 import { logExecution } from '@/lib/notifications/log-execution'
 import {
   createTemDomain,
@@ -99,7 +100,9 @@ export async function listChannels(orgId: string): Promise<McpResult> {
         c.type === 'email'
           ? (c.config as { email?: string }).email
           : c.type === 'discord_dm'
-            ? `discord_user_id ${(c.config as { discord_user_id?: string }).discord_user_id || '?'}`
+            ? ((c.config as { recipient?: string }).recipient === 'member'
+                ? 'membre concerné par l\'événement'
+                : `discord_user_id ${(c.config as { discord_user_id?: string }).discord_user_id || '?'}`)
             : `...${((c.config as { webhook_url?: string }).webhook_url || '').slice(-16)}`,
       is_verified: c.is_verified,
       is_active: c.is_active,
@@ -111,9 +114,14 @@ async function verifyChannelConfig(
   type: string,
   webhookUrl?: string,
   email?: string,
-  discordUserId?: string
+  discordUserId?: string,
+  recipient?: string
 ): Promise<{ config: Record<string, unknown>; isVerified: boolean } | { error: string }> {
   if (type === 'discord_dm') {
+    // Mode "membre concerné" : aucun ID, destinataire résolu à l'envoi
+    if (recipient === 'member' || (!discordUserId && recipient !== 'fixed')) {
+      return { config: { recipient: 'member' }, isVerified: true }
+    }
     const check = await verifyDiscordUser(discordUserId || '')
     if (!check.ok) return { error: check.error || 'ID Discord invalide' }
     return { config: { discord_user_id: discordUserId }, isVerified: true }
@@ -146,7 +154,7 @@ async function verifyChannelConfig(
 
 export async function createChannel(orgId: string, userId: string, args: Args): Promise<McpResult> {
   const type = str(args.type) || ''
-  const verified = await verifyChannelConfig(type, str(args.webhook_url), str(args.email), str(args.discord_user_id))
+  const verified = await verifyChannelConfig(type, str(args.webhook_url), str(args.email), str(args.discord_user_id), str(args.recipient))
   if ('error' in verified) return fail(verified.error)
 
   const supabase = createServiceClient()
@@ -190,9 +198,9 @@ export async function updateChannel(orgId: string, args: Args): Promise<McpResul
   if (args.label !== undefined) updates.label = str(args.label) || null
   if (typeof args.is_active === 'boolean') updates.is_active = args.is_active
 
-  const newDest = str(args.webhook_url) || str(args.email) || str(args.discord_user_id)
+  const newDest = str(args.webhook_url) || str(args.email) || str(args.discord_user_id) || str(args.recipient)
   if (newDest) {
-    const verified = await verifyChannelConfig(channel.type, str(args.webhook_url), str(args.email), str(args.discord_user_id))
+    const verified = await verifyChannelConfig(channel.type, str(args.webhook_url), str(args.email), str(args.discord_user_id), str(args.recipient))
     if ('error' in verified) return fail(verified.error)
     updates.config = verified.config
     updates.is_verified = verified.isVerified
@@ -438,6 +446,13 @@ export async function testWorkflow(orgId: string, userId: string, args: Args): P
     if (channel.type !== 'email') return fail("override_email ne s'applique qu'aux canaux email")
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(overrideEmail)) return fail('Adresse email de test invalide')
     config = { ...channel.config, email: overrideEmail }
+  }
+
+  // Canal MP "membre concerné" : le test s'envoie à l'admin testeur lui-même
+  if (channel.type === 'discord_dm' && channel.config?.recipient === 'member') {
+    const discordId = await resolveDiscordUserId(userId)
+    if (!discordId) return fail('Aucun compte Discord lié à votre profil pour recevoir le test')
+    config = { ...channel.config, discord_user_id: discordId }
   }
 
   const dispatcher = getDispatcher(channel.type)

@@ -39,14 +39,15 @@ export const hubTools: McpTool[] = [
   {
     name: 'create_channel',
     description:
-      "Crée un canal de notification. discord_webhook : message dans un salon (fournir webhook_url, vérifié automatiquement). discord_dm : message privé à un membre via le bot Notify, qui doit être présent sur le serveur de l'organisation (fournir discord_user_id). email : fournir email.",
+      "Crée un canal de notification. discord_webhook : message dans un salon (fournir webhook_url). discord_dm : message privé via le bot Notify (présent sur le serveur de l'organisation) — par défaut au membre concerné par l'événement (recipient='member', aucun ID requis, mode recommandé pour notifier les membres) ; pour toujours notifier la même personne, recipient='fixed' + discord_user_id. email : fournir email.",
     inputSchema: {
       type: 'object',
       properties: {
         type: { type: 'string', enum: ['discord_webhook', 'discord_dm', 'email'], description: 'Type de canal' },
-        label: { type: 'string', description: 'Nom du canal (ex: "#annonces", "MP capitaine", "Email staff")' },
+        label: { type: 'string', description: 'Nom du canal (ex: "#annonces", "MP au membre concerné", "Email staff")' },
         webhook_url: { type: 'string', description: 'URL du webhook Discord (type discord_webhook)' },
-        discord_user_id: { type: 'string', description: 'ID Discord du destinataire des MP (type discord_dm)' },
+        recipient: { type: 'string', enum: ['member', 'fixed'], description: "MP Discord : 'member' (membre concerné, défaut) ou 'fixed' (personne précise)" },
+        discord_user_id: { type: 'string', description: 'ID Discord (type discord_dm, uniquement si recipient=fixed)' },
         email: { type: 'string', description: 'Adresse email (type email)' },
       },
       required: ['type'],

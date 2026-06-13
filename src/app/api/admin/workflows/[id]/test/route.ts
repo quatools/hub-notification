@@ -3,6 +3,7 @@ import { getAdminAuthForWorkflow } from '@/lib/auth/admin'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getDispatcher } from '@/lib/dispatchers'
 import { getSenderIdentity } from '@/lib/notifications/sender'
+import { resolveDiscordUserId } from '@/lib/notifications/discord-recipient'
 import { logExecution } from '@/lib/notifications/log-execution'
 import type { NotificationEvent } from '@/lib/types/notifications'
 
@@ -110,6 +111,18 @@ export async function POST(
       return NextResponse.json({ error: 'Adresse email de test invalide' }, { status: 400 })
     }
     config = { ...channel.config, email: options.override_email }
+  }
+
+  // Canal MP "membre concerné" : le test s'envoie à l'admin testeur lui-même
+  if (channel.type === 'discord_dm' && channel.config?.recipient === 'member') {
+    const discordId = await resolveDiscordUserId(auth.user_id)
+    if (!discordId) {
+      return NextResponse.json(
+        { error: "Aucun compte Discord lié à votre profil — connectez-vous via Discord pour tester ce canal" },
+        { status: 400 }
+      )
+    }
+    config = { ...channel.config, discord_user_id: discordId }
   }
 
   // Dispatcher

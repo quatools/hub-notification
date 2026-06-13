@@ -81,12 +81,21 @@ export async function POST(request: NextRequest) {
   }
 
   if (body.type === 'discord_dm') {
-    const check = await verifyDiscordUser(body.config.discord_user_id as string)
-    if (!check.ok) {
-      return NextResponse.json({ error: check.error }, { status: 400 })
+    // Mode "membre concerné" : pas d'ID à saisir, le destinataire est résolu
+    // à l'envoi depuis le compte Discord du membre concerné par l'événement.
+    if (body.config.recipient === 'member') {
+      body.config = { recipient: 'member' }
+      isVerified = true
+      if (!body.label) body.label = 'MP au membre concerné'
+    } else {
+      // Mode "personne précise" : ID Discord fixe (capitaine, admin, test)
+      const check = await verifyDiscordUser(body.config.discord_user_id as string)
+      if (!check.ok) {
+        return NextResponse.json({ error: check.error }, { status: 400 })
+      }
+      isVerified = true
+      if (!body.label && check.username) body.label = `MP @${check.username}`
     }
-    isVerified = true
-    if (!body.label && check.username) body.label = `MP @${check.username}`
   }
 
   const supabase = createServiceClient()
