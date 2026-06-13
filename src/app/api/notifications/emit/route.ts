@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { resolveRoutes } from '@/lib/notifications/routing'
 import { getSenderIdentity } from '@/lib/notifications/sender'
 import { resolveDiscordUserId } from '@/lib/notifications/discord-recipient'
+import { resolveRecipient } from '@/lib/notifications/recipients'
 import { getDispatcher } from '@/lib/dispatchers'
 import type { EmitRequest, EmitResponse, NotificationEvent } from '@/lib/types/notifications'
 
@@ -54,6 +55,23 @@ export async function POST(request: NextRequest) {
 
   const notifEvent = event as NotificationEvent
 
+  // 4b. Enregistrer les destinataires fournis par l'event (CDC v2).
+  // Crée/retrouve une fiche destinataire par descripteur (sans rien envoyer) :
+  // c'est ce qui rend les notifications rattachables au compte hub du membre.
+  if (Array.isArray(body.recipients)) {
+    await Promise.allSettled(
+      body.recipients.map((r) =>
+        resolveRecipient({
+          app: auth.app,
+          appUserId: r.app_user_id,
+          email: r.email,
+          discordId: r.discord_id,
+          name: r.name,
+        })
+      )
+    )
+  }
+
   // 5. Résoudre les routes via les workflows
   const routes = await resolveRoutes(notifEvent, body.org_id, body.target_users)
 
@@ -73,6 +91,16 @@ export async function POST(request: NextRequest) {
   const channelTypes = new Set<string>()
 
   const dispatchPromises = routes.map(async (route) => {
+    // Rattacher l'exécution à une fiche destinataire (pour la vue membre + opt-out).
+    // Best-effort : un échec de résolution ne bloque jamais l'envoi.
+    let recipientId: string | null = null
+    try {
+      const resolved = await resolveRecipient({ authUserId: route.user_id })
+      recipientId = resolved.recipientId
+    } catch {
+      recipientId = null
+    }
+
     // Créer l'exécution (status pending)
     const { data: execution, error: execError } = await supabase
       .schema('notifications')
@@ -82,6 +110,7 @@ export async function POST(request: NextRequest) {
         event_slug: body.event,
         channel_id: route.channel_id,
         user_id: route.user_id,
+        recipient_id: recipientId,
         org_id: body.org_id,
         status: 'pending',
         payload: body.payload,

@@ -121,10 +121,20 @@ export interface RegisterResponse {
   new: number
 }
 
+// Descripteur de destinataire (CDC v2) : l'app fournit les coordonnées du membre
+// concerné. Le hub les enregistre sur une fiche destinataire (rattachable ensuite).
+export interface EmitRecipientDescriptor {
+  app_user_id?: string   // id du membre côté app
+  email?: string
+  discord_id?: string
+  name?: string
+}
+
 export interface EmitRequest {
   event: string
   org_id: string
-  target_users?: string[]
+  target_users?: string[]                 // legacy (auth.users ids) — rétrocompat
+  recipients?: EmitRecipientDescriptor[]  // CDC v2 — descripteurs
   payload: Record<string, unknown>
 }
 
