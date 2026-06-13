@@ -125,3 +125,64 @@ export async function resolveRecipient(d: RecipientDescriptor): Promise<Resolved
 
   return { recipientId, created }
 }
+
+/**
+ * Rattache une identité d'app à la personne hub authentifiée (claim).
+ * - garantit la personne ancrée sur auth.users (la crée au besoin, is_claimed) ;
+ * - si une (ou des) fiche(s) flottante(s) portent déjà l'identité app/discord,
+ *   elle(s) est/sont FUSIONNÉE(S) dans la personne (les notifs remontent) ;
+ * - rattache les identités fournies.
+ * Retourne le recipient_id canonique.
+ */
+export async function claimAppIdentity(
+  authUserId: string,
+  name: string | null,
+  ident: { app: string; appUserId: string; email?: string | null; discordId?: string | null }
+): Promise<string> {
+  const sb = schema()
+
+  // 1. Personne ancrée auth.users (créée si besoin)
+  const { data: existing } = await sb
+    .from('recipients')
+    .select('id')
+    .eq('auth_user_id', authUserId)
+    .maybeSingle()
+
+  let keepId = (existing as { id?: string } | null)?.id ?? null
+  if (!keepId) {
+    const { data, error } = await sb
+      .from('recipients')
+      .insert({ auth_user_id: authUserId, is_claimed: true, display_name: name })
+      .select('id')
+      .single()
+    if (error || !data) throw new Error(`claimAppIdentity: création personne impossible (${error?.message})`)
+    keepId = (data as { id: string }).id
+  } else {
+    await sb
+      .from('recipients')
+      .update({ is_claimed: true, ...(name ? { display_name: name } : {}) })
+      .eq('id', keepId)
+  }
+
+  // 2. Fiches flottantes portant l'identité app / discord → à fusionner
+  const toMerge = new Set<string>()
+  const byApp = await findByKeyIdentity('app', ident.app, ident.appUserId)
+  if (byApp && byApp !== keepId) toMerge.add(byApp)
+  if (ident.discordId) {
+    const byDiscord = await findByKeyIdentity('discord', null, ident.discordId)
+    if (byDiscord && byDiscord !== keepId) toMerge.add(byDiscord)
+  }
+  for (const dropId of toMerge) {
+    const { error } = await createServiceClient()
+      .schema('notifications')
+      .rpc('merge_recipients', { keep_id: keepId, drop_id: dropId })
+    if (error) console.error('claimAppIdentity merge:', error)
+  }
+
+  // 3. Rattacher les identités fournies à la personne canonique
+  await ensureIdentity(keepId, 'app', ident.app, ident.appUserId, true)
+  if (ident.discordId) await ensureIdentity(keepId, 'discord', null, ident.discordId, true)
+  if (ident.email) await ensureIdentity(keepId, 'email', null, ident.email.toLowerCase(), false)
+
+  return keepId
+}
