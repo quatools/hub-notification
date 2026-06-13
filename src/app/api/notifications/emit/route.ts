@@ -192,16 +192,20 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // 8. Dispatcher en parallèle avec logging dans workflow_executions
+  // 8. Créer les exécutions (rapide) PUIS répondre, et dispatcher en arrière-plan.
+  // Le dispatch (SMTP/Discord) peut être lent ; faire attendre l'appelant ferait
+  // expirer son fetch (timeout). Le hub étant un serveur Node persistant, les
+  // promesses de dispatch continuent de tourner après la réponse HTTP.
   const executionIds: string[] = []
   const channelTypes = new Set<string>()
+  const toDispatch: { executionId: string; job: DeliveryJob }[] = []
 
-  const dispatchPromises = jobs.map(async (job) => {
+  for (const job of jobs) {
     const { route } = job
 
     // Refus du membre → on n'envoie pas (et on ne crée pas d'exécution).
     if (job.isMember && job.recipientId && optoutSet.has(`${job.recipientId}:${route.workflow_id}`)) {
-      return
+      continue
     }
 
     // Créer l'exécution (status pending)
@@ -223,57 +227,59 @@ export async function POST(request: NextRequest) {
 
     if (execError || !execution) {
       console.error('Erreur création execution:', execError)
-      return
+      continue
     }
 
     executionIds.push(execution.id)
     channelTypes.add(route.channel_type)
+    toDispatch.push({ executionId: execution.id, job })
+  }
 
-    // Destinataire membre sans identité utilisable (pas de Discord/email) → échec propre.
-    if (job.skipReason) {
-      await supabase
-        .schema('notifications')
-        .from('workflow_executions')
-        .update({ status: 'failed', error_message: job.skipReason })
-        .eq('id', execution.id)
-      return
-    }
-
-    const dispatcher = getDispatcher(route.channel_type)
-    if (!dispatcher) {
-      await supabase
-        .schema('notifications')
-        .from('workflow_executions')
+  // Envoi effectif (en arrière-plan, NON attendu).
+  const runDispatch = async ({ executionId, job }: { executionId: string; job: DeliveryJob }) => {
+    const { route } = job
+    const execs = () => supabase.schema('notifications').from('workflow_executions')
+    try {
+      // Destinataire membre sans identité utilisable → échec propre.
+      if (job.skipReason) {
+        await execs().update({ status: 'failed', error_message: job.skipReason }).eq('id', executionId)
+        return
+      }
+      const dispatcher = getDispatcher(route.channel_type)
+      if (!dispatcher) {
+        await execs()
+          .update({ status: 'failed', error_message: `Dispatcher non trouvé pour le type: ${route.channel_type}` })
+          .eq('id', executionId)
+        return
+      }
+      const result = await dispatcher({
+        config: job.dispatchConfig,
+        event: notifEvent,
+        payload: body.payload,
+        step: route.step,
+        sender,
+      })
+      await execs()
+        .update({
+          status: result.success ? 'sent' : 'failed',
+          error_message: result.error || null,
+          sent_at: result.success ? new Date().toISOString() : null,
+          attempts: 1,
+        })
+        .eq('id', executionId)
+    } catch (e) {
+      await execs()
         .update({
           status: 'failed',
-          error_message: `Dispatcher non trouvé pour le type: ${route.channel_type}`,
+          error_message: e instanceof Error ? e.message : 'Erreur dispatch inconnue',
+          attempts: 1,
         })
-        .eq('id', execution.id)
-      return
+        .eq('id', executionId)
     }
+  }
 
-    const result = await dispatcher({
-      config: job.dispatchConfig,
-      event: notifEvent,
-      payload: body.payload,
-      step: route.step,
-      sender,
-    })
-
-    await supabase
-      .schema('notifications')
-      .from('workflow_executions')
-      .update({
-        status: result.success ? 'sent' : 'failed',
-        error_message: result.error || null,
-        sent_at: result.success ? new Date().toISOString() : null,
-        attempts: 1,
-      })
-      .eq('id', execution.id)
-  })
-
-  // Attendre tous les dispatches (un échec n'empêche pas les autres)
-  await Promise.allSettled(dispatchPromises)
+  // Pas de await : la réponse part immédiatement, le dispatch se termine après.
+  void Promise.allSettled(toDispatch.map(runDispatch))
 
   const response: EmitResponse = {
     dispatched: executionIds.length,
