@@ -208,6 +208,12 @@ export async function POST(request: NextRequest) {
       continue
     }
 
+    // Adresse de livraison résolue (pour l'historique membre : « envoyé à … »).
+    // Webhook = salon d'org → pas de compte perso.
+    let destination: string | null = null
+    if (route.channel_type === 'email') destination = (job.dispatchConfig.email as string) || null
+    else if (route.channel_type === 'discord_dm') destination = (job.dispatchConfig.discord_user_id as string) || null
+
     // Créer l'exécution (status pending)
     const { data: execution, error: execError } = await supabase
       .schema('notifications')
@@ -221,6 +227,7 @@ export async function POST(request: NextRequest) {
         org_id: body.org_id,
         status: 'pending',
         payload: body.payload,
+        destination,
       })
       .select('id')
       .single()

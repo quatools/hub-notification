@@ -16,6 +16,7 @@ interface HistoryItem {
   event_category: string | null
   channel_type: string | null
   channel_label: string | null
+  destination: string | null
   status: "pending" | "sent" | "failed"
   sent_at: string | null
   created_at: string
@@ -61,6 +62,14 @@ function HistoryContent() {
 
   const fmt = (iso: string) =>
     new Date(iso).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
+
+  // « Sur quel compte » : adresse résolue, présentée de façon lisible.
+  const destinationLabel = (it: HistoryItem) => {
+    if (it.channel_type === "email") return it.destination || "votre email"
+    if (it.channel_type === "discord_dm") return "votre Discord"
+    if (it.channel_type === "discord_webhook") return it.channel_label || "salon Discord"
+    return it.destination || it.channel_label || "—"
+  }
 
   if (clubLoading) {
     return <div className="space-y-4"><Skeleton className="h-8 w-64" /><Skeleton className="h-20" /><Skeleton className="h-20" /></div>
@@ -109,7 +118,8 @@ function HistoryContent() {
                     <div className="min-w-0">
                       <CardTitle className="text-sm font-medium truncate">{it.event_label}</CardTitle>
                       <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                        via {it.channel_label || it.channel_type || "—"} · {fmt(it.sent_at || it.created_at)}
+                        Envoyé à <span className="font-medium text-foreground/80">{destinationLabel(it)}</span>
+                        {" · "}{fmt(it.sent_at || it.created_at)}
                       </p>
                     </div>
                   </div>
