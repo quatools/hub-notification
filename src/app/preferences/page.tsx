@@ -9,10 +9,11 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useClub } from "@/lib/contexts/club-context"
 import { toast } from "sonner"
 import Link from "next/link"
-import { Radio, Mail, BellOff, Info, LogIn } from "lucide-react"
+import { Radio, Mail, MessageCircle, BellOff, Info, LogIn } from "lucide-react"
 
 interface WorkflowOptout {
   workflow_id: string
+  event_id: string
   event_label: string
   event_category: string
   channel_type: string
@@ -76,25 +77,37 @@ function PreferencesContent() {
   const getChannelIcon = (type: string) => {
     switch (type) {
       case "discord_webhook": return <Radio className="h-4 w-4 text-indigo-500" />
+      case "discord_dm": return <MessageCircle className="h-4 w-4 text-indigo-500" />
       case "email": return <Mail className="h-4 w-4 text-blue-500" />
-      default: return <Radio className="h-4 w-4" />
+      default: return <Radio className="h-4 w-4 text-muted-foreground" />
     }
   }
 
   const getChannelLabel = (wf: WorkflowOptout) => {
     if (wf.channel_label) return wf.channel_label
-    return wf.channel_type === "discord_webhook" ? "Discord" : wf.channel_type === "email" ? "Email" : wf.channel_type
+    switch (wf.channel_type) {
+      case "discord_webhook": return "Discord (salon)"
+      case "discord_dm": return "Discord (message privé)"
+      case "email": return "Email"
+      default: return wf.channel_type
+    }
   }
 
-  // Group by category
+  // Group: catégorie -> événement -> canaux (un toggle par canal)
   const categories = useMemo(() => {
-    const map = new Map<string, WorkflowOptout[]>()
+    const cats = new Map<string, Map<string, { label: string; items: WorkflowOptout[] }>>()
     for (const wf of workflows) {
       const cat = CATEGORY_LABELS[wf.event_category] || wf.event_category || "Autre"
-      if (!map.has(cat)) map.set(cat, [])
-      map.get(cat)!.push(wf)
+      if (!cats.has(cat)) cats.set(cat, new Map())
+      const evMap = cats.get(cat)!
+      const key = wf.event_id || wf.event_label
+      if (!evMap.has(key)) evMap.set(key, { label: wf.event_label, items: [] })
+      evMap.get(key)!.items.push(wf)
     }
-    return Array.from(map.entries())
+    return Array.from(cats.entries()).map(([cat, evMap]) => ({
+      category: cat,
+      events: Array.from(evMap.values()),
+    }))
   }, [workflows])
 
   if (clubLoading) {
@@ -139,8 +152,8 @@ function PreferencesContent() {
       <div>
         <h1 className="text-2xl font-bold">Mes notifications</h1>
         <p className="text-muted-foreground mt-1">
-          L&apos;administrateur de votre organisation a configuré ces notifications.
-          Vous pouvez désactiver celles que vous ne souhaitez pas recevoir.
+          Voici ce qui vous est envoyé, et sur quels canaux. Un même événement peut partir sur plusieurs
+          canaux&nbsp;: activez ou désactivez chacun comme vous le souhaitez.
         </p>
       </div>
 
@@ -156,35 +169,36 @@ function PreferencesContent() {
         </Card>
       ) : (
         <>
-          {categories.map(([category, items]) => (
+          {categories.map(({ category, events }) => (
             <div key={category}>
               <h2 className="text-lg font-semibold mb-3">{category}</h2>
-              <div className="space-y-2">
-                {items.map((wf) => (
-                  <Card key={wf.workflow_id}>
-                    <CardHeader className="py-3 px-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          {getChannelIcon(wf.channel_type)}
-                          <div>
-                            <CardTitle className="text-sm font-medium">{wf.event_label}</CardTitle>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              via {getChannelLabel(wf)}
-                            </p>
+              <div className="space-y-3">
+                {events.map((ev) => (
+                  <Card key={ev.label} className="overflow-hidden">
+                    <CardHeader className="py-3 px-4 bg-muted/30 border-b">
+                      <CardTitle className="text-sm font-semibold">{ev.label}</CardTitle>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {ev.items.length === 1 ? "Envoyé sur 1 canal" : `Envoyé sur ${ev.items.length} canaux`}
+                      </p>
+                    </CardHeader>
+                    <CardContent className="p-0 divide-y">
+                      {ev.items.map((wf) => (
+                        <div key={wf.workflow_id} className="flex items-center justify-between px-4 py-2.5">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            {getChannelIcon(wf.channel_type)}
+                            <span className="text-sm truncate">{getChannelLabel(wf)}</span>
+                            {wf.is_opted_out && (
+                              <Badge variant="secondary" className="text-xs shrink-0">Désactivé</Badge>
+                            )}
                           </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          {wf.is_opted_out && (
-                            <Badge variant="secondary" className="text-xs">Désactivé</Badge>
-                          )}
                           <Switch
                             checked={!wf.is_opted_out}
                             onCheckedChange={() => handleToggle(wf.workflow_id, wf.is_opted_out)}
                             disabled={toggling === wf.workflow_id}
                           />
                         </div>
-                      </div>
-                    </CardHeader>
+                      ))}
+                    </CardContent>
                   </Card>
                 ))}
               </div>
@@ -193,14 +207,24 @@ function PreferencesContent() {
 
           <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-md">
             <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-            <p className="text-xs text-muted-foreground">
-              Les canaux (Discord, email) configurés par l&apos;administrateur définissent où vous recevez ces
-              notifications. Ici, vous <strong>activez ou désactivez</strong> chacune. Pour les{" "}
-              <strong>rerouter ou renvoyer vers vos propres adresses</strong>, connectez un canal dans{" "}
-              <Link href="/preferences/channels" className="underline underline-offset-2 hover:text-foreground">
-                «&nbsp;Mes canaux de réception&nbsp;»
-              </Link>.
-            </p>
+            <div className="text-xs text-muted-foreground space-y-1.5">
+              <p>
+                Quand un canal n&apos;a pas d&apos;adresse fixe, la notification part sur les coordonnées
+                fournies par le service qui la déclenche (l&apos;email ou le Discord que votre application a
+                pour vous).{" "}
+                <Link href="/preferences/history" className="underline underline-offset-2 hover:text-foreground">
+                  Consultez votre historique
+                </Link>{" "}
+                pour voir sur quels comptes vos notifications ont été envoyées.
+              </p>
+              <p>
+                Pour <strong>rerouter ou renvoyer</strong> vos notifications vers vos propres adresses, connectez
+                un canal dans{" "}
+                <Link href="/preferences/channels" className="underline underline-offset-2 hover:text-foreground">
+                  «&nbsp;Mes canaux de réception&nbsp;»
+                </Link>.
+              </p>
+            </div>
           </div>
         </>
       )}

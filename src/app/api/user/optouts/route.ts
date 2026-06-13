@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
     .from('workflows')
     .select(`
       id,
+      event_id,
       events:event_id (
         label,
         category,
@@ -68,6 +69,7 @@ export async function GET(request: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const result = memberWorkflows.map((wf: any) => ({
     workflow_id: wf.id,
+    event_id: wf.event_id || wf.events?.label || '',
     event_label: wf.events?.label || '',
     event_category: wf.events?.category || '',
     channel_type: wf.channels?.type || '',
