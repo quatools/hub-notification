@@ -3,7 +3,6 @@ import { validateApiKey } from '@/lib/auth/api-key'
 import { createServiceClient } from '@/lib/supabase/server'
 import { resolveRoutes, type RouteResult } from '@/lib/notifications/routing'
 import { getSenderIdentity } from '@/lib/notifications/sender'
-import { resolveDiscordUserId } from '@/lib/notifications/discord-recipient'
 import { resolveRecipient } from '@/lib/notifications/recipients'
 import { getDispatcher } from '@/lib/dispatchers'
 import type { EmitRequest, EmitResponse, NotificationEvent } from '@/lib/types/notifications'
@@ -123,45 +122,52 @@ export async function POST(request: NextRequest) {
     const config = route.channel_config || {}
     const memberAddressed = config.recipient === 'member'
 
-    if (memberAddressed && members.length > 0) {
-      // Un envoi par destinataire fourni par l'event.
-      for (const m of members) {
-        let dispatchConfig: Record<string, unknown> = config
-        let skipReason: string | undefined
-        if (route.channel_type === 'discord_dm') {
-          if (m.discordId) dispatchConfig = { ...config, discord_user_id: m.discordId }
-          else skipReason = 'Aucun compte Discord pour ce membre'
-        } else if (route.channel_type === 'email') {
-          if (m.email) dispatchConfig = { ...config, email: m.email }
-          else skipReason = 'Aucun email pour ce membre'
+    if (memberAddressed) {
+      if (members.length > 0) {
+        // Un envoi par destinataire fourni par l'event, sur SON identité.
+        for (const m of members) {
+          let dispatchConfig: Record<string, unknown> = config
+          let skipReason: string | undefined
+          if (route.channel_type === 'discord_dm') {
+            if (m.discordId) dispatchConfig = { ...config, discord_user_id: m.discordId }
+            else skipReason = 'Aucun compte Discord pour ce membre'
+          } else if (route.channel_type === 'email') {
+            if (m.email) dispatchConfig = { ...config, email: m.email }
+            else skipReason = 'Aucun email pour ce membre'
+          }
+          jobs.push({
+            route,
+            recipientId: m.recipientId,
+            userId: m.appUserId || m.recipientId,
+            dispatchConfig,
+            isMember: true,
+            skipReason,
+          })
         }
+      } else {
+        // Canal "membre concerné" mais l'event n'a fourni AUCUN destinataire.
+        // On NE retombe JAMAIS sur l'admin / le créateur du workflow : le hub
+        // n'invente pas de destination. Échec explicite pour que l'app corrige
+        // (il manque le descripteur recipients dans son emit).
         jobs.push({
           route,
-          recipientId: m.recipientId,
-          userId: m.appUserId || m.recipientId,
-          dispatchConfig,
+          recipientId: null,
+          userId: route.user_id,
+          dispatchConfig: config,
           isMember: true,
-          skipReason,
+          skipReason:
+            "Canal « membre concerné » mais l'événement n'a fourni aucun destinataire (recipients). Aucun envoi.",
         })
       }
     } else {
-      // Route d'org / admin : fiche résolue depuis route.user_id (auth hub).
+      // Route d'org / admin (webhook, email/DM à adresse fixe) : inchangé.
       let recipientId: string | null = null
       try {
         recipientId = (await resolveRecipient({ authUserId: route.user_id })).recipientId
       } catch {
         recipientId = null
       }
-      // Canal MP "membre" SANS descripteur fourni : on tente l'ancienne
-      // résolution Discord par user_id (membre déjà connu côté hub via Discord).
-      let dispatchConfig: Record<string, unknown> = config
-      let skipReason: string | undefined
-      if (route.channel_type === 'discord_dm' && memberAddressed) {
-        const discordId = await resolveDiscordUserId(route.user_id)
-        if (discordId) dispatchConfig = { ...config, discord_user_id: discordId }
-        else skipReason = 'Aucun compte Discord lié à ce membre (connexion via Discord requise)'
-      }
-      jobs.push({ route, recipientId, userId: route.user_id, dispatchConfig, isMember: false, skipReason })
+      jobs.push({ route, recipientId, userId: route.user_id, dispatchConfig: config, isMember: false })
     }
   }
 
