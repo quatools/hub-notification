@@ -25,18 +25,38 @@ export async function getMemberOrgs(authUserId: string): Promise<MemberOrg[]> {
     .maybeSingle()
 
   if (!recipient) return []
+  const recipientId = (recipient as { id: string }).id
 
-  // 2. Les org_id distincts des notifications reçues
+  // 2. Les org_id distincts des notifications reçues...
   const { data: execs } = await supabase
     .schema('notifications')
     .from('workflow_executions')
     .select('org_id')
-    .eq('recipient_id', (recipient as { id: string }).id)
+    .eq('recipient_id', recipientId)
     .not('org_id', 'is', null)
 
-  const orgIds = Array.from(
-    new Set(((execs as { org_id: string }[] | null) || []).map((e) => e.org_id))
-  )
+  const orgIdSet = new Set(((execs as { org_id: string }[] | null) || []).map((e) => e.org_id))
+
+  // ...complétées par les orgs où le membre a déjà posé un refus (opt-out) :
+  // l'org reste visible même s'il a tout désactivé (pour pouvoir réactiver).
+  const { data: optouts } = await supabase
+    .schema('notifications')
+    .from('user_optouts')
+    .select('workflow_id')
+    .eq('recipient_id', recipientId)
+  const optoutWfIds = ((optouts as { workflow_id: string }[] | null) || []).map((o) => o.workflow_id)
+  if (optoutWfIds.length > 0) {
+    const { data: wfs } = await supabase
+      .schema('notifications')
+      .from('workflows')
+      .select('org_id')
+      .in('id', optoutWfIds)
+    for (const w of (wfs as { org_id: string }[] | null) || []) {
+      if (w.org_id) orgIdSet.add(w.org_id)
+    }
+  }
+
+  const orgIds = Array.from(orgIdSet)
   if (orgIds.length === 0) return []
 
   // 3. Noms des clubs

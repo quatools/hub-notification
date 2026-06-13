@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateApiKey } from '@/lib/auth/api-key'
 import { createServiceClient } from '@/lib/supabase/server'
-import { resolveRoutes } from '@/lib/notifications/routing'
+import { resolveRoutes, type RouteResult } from '@/lib/notifications/routing'
 import { getSenderIdentity } from '@/lib/notifications/sender'
 import { resolveDiscordUserId } from '@/lib/notifications/discord-recipient'
 import { resolveRecipient } from '@/lib/notifications/recipients'
@@ -55,21 +55,38 @@ export async function POST(request: NextRequest) {
 
   const notifEvent = event as NotificationEvent
 
-  // 4b. Enregistrer les destinataires fournis par l'event (CDC v2).
-  // Crée/retrouve une fiche destinataire par descripteur (sans rien envoyer) :
-  // c'est ce qui rend les notifications rattachables au compte hub du membre.
+  // 4b. Résoudre les destinataires fournis par l'event (CDC v2) en fiches
+  // canoniques. C'est ce qui rend les notifications rattachables au compte hub
+  // du membre ET ce qui permet de livrer "au membre concerné" sur SON identité.
+  // Aucun envoi ici : on ne fait que résoudre/rattacher.
+  interface ResolvedMember {
+    recipientId: string
+    appUserId: string | null
+    discordId: string | null
+    email: string | null
+    name: string | null
+  }
+  const members: ResolvedMember[] = []
   if (Array.isArray(body.recipients)) {
-    await Promise.allSettled(
-      body.recipients.map((r) =>
-        resolveRecipient({
+    const settled = await Promise.allSettled(
+      body.recipients.map(async (r) => {
+        const res = await resolveRecipient({
           app: auth.app,
           appUserId: r.app_user_id,
           email: r.email,
           discordId: r.discord_id,
           name: r.name,
         })
-      )
+        return {
+          recipientId: res.recipientId,
+          appUserId: r.app_user_id ?? null,
+          discordId: r.discord_id ?? null,
+          email: r.email ?? null,
+          name: r.name ?? null,
+        } satisfies ResolvedMember
+      })
     )
+    for (const s of settled) if (s.status === 'fulfilled') members.push(s.value)
   }
 
   // 5. Résoudre les routes via les workflows
@@ -86,19 +103,99 @@ export async function POST(request: NextRequest) {
   // 6. Identité d'expéditeur de l'org (marque blanche)
   const sender = await getSenderIdentity(body.org_id)
 
-  // 7. Dispatcher en parallèle avec logging dans workflow_executions
+  // 7. Construire les "jobs" de livraison.
+  // Canal "membre concerné" (config.recipient === 'member') : une livraison par
+  // destinataire fourni par l'event, adressée à SON identité (Discord/email) et
+  // rattachée à SA fiche → la personne peut ensuite refuser/rerouter.
+  // Sinon (webhook d'org, email/DM à adresse fixe) : comportement inchangé,
+  // destinataire = créateur du workflow (admin).
+  interface DeliveryJob {
+    route: RouteResult
+    recipientId: string | null
+    userId: string
+    dispatchConfig: Record<string, unknown>
+    isMember: boolean
+    skipReason?: string
+  }
+
+  const jobs: DeliveryJob[] = []
+  for (const route of routes) {
+    const config = route.channel_config || {}
+    const memberAddressed = config.recipient === 'member'
+
+    if (memberAddressed && members.length > 0) {
+      // Un envoi par destinataire fourni par l'event.
+      for (const m of members) {
+        let dispatchConfig: Record<string, unknown> = config
+        let skipReason: string | undefined
+        if (route.channel_type === 'discord_dm') {
+          if (m.discordId) dispatchConfig = { ...config, discord_user_id: m.discordId }
+          else skipReason = 'Aucun compte Discord pour ce membre'
+        } else if (route.channel_type === 'email') {
+          if (m.email) dispatchConfig = { ...config, email: m.email }
+          else skipReason = 'Aucun email pour ce membre'
+        }
+        jobs.push({
+          route,
+          recipientId: m.recipientId,
+          userId: m.appUserId || m.recipientId,
+          dispatchConfig,
+          isMember: true,
+          skipReason,
+        })
+      }
+    } else {
+      // Route d'org / admin : fiche résolue depuis route.user_id (auth hub).
+      let recipientId: string | null = null
+      try {
+        recipientId = (await resolveRecipient({ authUserId: route.user_id })).recipientId
+      } catch {
+        recipientId = null
+      }
+      // Canal MP "membre" SANS descripteur fourni : on tente l'ancienne
+      // résolution Discord par user_id (membre déjà connu côté hub via Discord).
+      let dispatchConfig: Record<string, unknown> = config
+      let skipReason: string | undefined
+      if (route.channel_type === 'discord_dm' && memberAddressed) {
+        const discordId = await resolveDiscordUserId(route.user_id)
+        if (discordId) dispatchConfig = { ...config, discord_user_id: discordId }
+        else skipReason = 'Aucun compte Discord lié à ce membre (connexion via Discord requise)'
+      }
+      jobs.push({ route, recipientId, userId: route.user_id, dispatchConfig, isMember: false, skipReason })
+    }
+  }
+
+  // 7b. Opt-out par destinataire : la personne peut refuser une notif qui LUI
+  // est adressée (jobs membre uniquement ; un webhook d'org reste une diffusion).
+  const memberRecipientIds = Array.from(
+    new Set(jobs.filter((j) => j.isMember && j.recipientId).map((j) => j.recipientId as string))
+  )
+  let optoutSet = new Set<string>() // `${recipientId}:${workflowId}`
+  if (memberRecipientIds.length > 0) {
+    const { data: optouts } = await supabase
+      .schema('notifications')
+      .from('user_optouts')
+      .select('recipient_id, workflow_id')
+      .in('recipient_id', memberRecipientIds)
+    if (optouts) {
+      optoutSet = new Set(
+        (optouts as { recipient_id: string; workflow_id: string }[]).map(
+          (o) => `${o.recipient_id}:${o.workflow_id}`
+        )
+      )
+    }
+  }
+
+  // 8. Dispatcher en parallèle avec logging dans workflow_executions
   const executionIds: string[] = []
   const channelTypes = new Set<string>()
 
-  const dispatchPromises = routes.map(async (route) => {
-    // Rattacher l'exécution à une fiche destinataire (pour la vue membre + opt-out).
-    // Best-effort : un échec de résolution ne bloque jamais l'envoi.
-    let recipientId: string | null = null
-    try {
-      const resolved = await resolveRecipient({ authUserId: route.user_id })
-      recipientId = resolved.recipientId
-    } catch {
-      recipientId = null
+  const dispatchPromises = jobs.map(async (job) => {
+    const { route } = job
+
+    // Refus du membre → on n'envoie pas (et on ne crée pas d'exécution).
+    if (job.isMember && job.recipientId && optoutSet.has(`${job.recipientId}:${route.workflow_id}`)) {
+      return
     }
 
     // Créer l'exécution (status pending)
@@ -109,8 +206,8 @@ export async function POST(request: NextRequest) {
         workflow_id: route.workflow_id,
         event_slug: body.event,
         channel_id: route.channel_id,
-        user_id: route.user_id,
-        recipient_id: recipientId,
+        user_id: job.userId,
+        recipient_id: job.recipientId,
         org_id: body.org_id,
         status: 'pending',
         payload: body.payload,
@@ -126,7 +223,16 @@ export async function POST(request: NextRequest) {
     executionIds.push(execution.id)
     channelTypes.add(route.channel_type)
 
-    // Dispatcher
+    // Destinataire membre sans identité utilisable (pas de Discord/email) → échec propre.
+    if (job.skipReason) {
+      await supabase
+        .schema('notifications')
+        .from('workflow_executions')
+        .update({ status: 'failed', error_message: job.skipReason })
+        .eq('id', execution.id)
+      return
+    }
+
     const dispatcher = getDispatcher(route.channel_type)
     if (!dispatcher) {
       await supabase
@@ -140,33 +246,14 @@ export async function POST(request: NextRequest) {
       return
     }
 
-    // Canal MP "membre concerné" : résoudre l'ID Discord du destinataire (route.user_id)
-    let dispatchConfig = route.channel_config
-    if (route.channel_type === 'discord_dm' && route.channel_config.recipient === 'member') {
-      const discordId = await resolveDiscordUserId(route.user_id)
-      if (!discordId) {
-        await supabase
-          .schema('notifications')
-          .from('workflow_executions')
-          .update({
-            status: 'failed',
-            error_message: 'Aucun compte Discord lié à ce membre (connexion via Discord requise)',
-          })
-          .eq('id', execution.id)
-        return
-      }
-      dispatchConfig = { ...route.channel_config, discord_user_id: discordId }
-    }
-
     const result = await dispatcher({
-      config: dispatchConfig,
+      config: job.dispatchConfig,
       event: notifEvent,
       payload: body.payload,
       step: route.step,
       sender,
     })
 
-    // Mettre à jour l'exécution
     await supabase
       .schema('notifications')
       .from('workflow_executions')

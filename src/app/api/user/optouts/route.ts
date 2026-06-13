@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/supabase/api-auth'
 import { createServiceClient } from '@/lib/supabase/server'
+import { resolveRecipient } from '@/lib/notifications/recipients'
 
 // GET /api/user/optouts?org_id=xxx
 export async function GET(request: NextRequest) {
@@ -111,6 +112,15 @@ export async function PUT(request: NextRequest) {
   }
 
   if (body.opted_out) {
+    // Fiche destinataire canonique de l'utilisateur connecté : c'est par
+    // recipient_id que le routage applique le refus (cohérent multi-apps).
+    let recipientId: string | null = null
+    try {
+      recipientId = (await resolveRecipient({ authUserId: user.id })).recipientId
+    } catch {
+      recipientId = null
+    }
+
     // Créer l'opt-out
     const { error } = await supabase
       .schema('notifications')
@@ -118,6 +128,7 @@ export async function PUT(request: NextRequest) {
       .upsert({
         user_id: user.id,
         workflow_id: body.workflow_id,
+        recipient_id: recipientId,
       }, { onConflict: 'user_id,workflow_id' })
 
     if (error) {
