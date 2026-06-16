@@ -1,14 +1,11 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { useClub } from "@/lib/contexts/club-context"
 import { toast } from "sonner"
@@ -22,6 +19,26 @@ interface Channel {
   is_active: boolean
   is_verified: boolean
   created_at: string
+}
+
+const DISCORD_APP_ID = process.env.NEXT_PUBLIC_DISCORD_APP_ID
+const BOT_INVITE_URL = DISCORD_APP_ID
+  ? `https://discord.com/oauth2/authorize?client_id=${DISCORD_APP_ID}&scope=bot&permissions=0`
+  : null
+
+const TYPES = [
+  { value: "discord_webhook", label: "Salon Discord", dot: "#5865F2" },
+  { value: "discord_dm", label: "MP joueur", dot: "#5865F2" },
+  { value: "email", label: "Email", dot: "#C05B2E" },
+]
+
+/** Petit logo Discord pour le bouton d'invitation. */
+function DiscordGlyph({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <path d="M19.6 5.6A17 17 0 0 0 15.4 4l-.2.4a13 13 0 0 1 3.7 1.9 12 12 0 0 0-10 0A13 13 0 0 1 12.6 4.4L12.4 4a17 17 0 0 0-4.2 1.6C5 9 4.3 12.4 4.6 15.7A17 17 0 0 0 9.8 18l.4-.6a11 11 0 0 1-1.8-.9l.4-.3a8.6 8.6 0 0 0 7.3 0l.4.3a11 11 0 0 1-1.8.9l.4.6a17 17 0 0 0 5.2-2.3c.4-3.9-.6-7.3-2.9-10zM9.7 13.6c-.8 0-1.5-.8-1.5-1.7s.7-1.7 1.5-1.7 1.5.8 1.5 1.7-.7 1.7-1.5 1.7zm4.6 0c-.8 0-1.5-.8-1.5-1.7s.7-1.7 1.5-1.7 1.5.8 1.5 1.7-.7 1.7-1.5 1.7z" />
+    </svg>
+  )
 }
 
 export default function AdminChannelsPage() {
@@ -153,16 +170,16 @@ export default function AdminChannelsPage() {
 
   const getChannelIcon = (type: string) => {
     switch (type) {
-      case "discord_webhook": return <Radio className="h-5 w-5 text-indigo-500" />
-      case "discord_dm": return <MessageCircle className="h-5 w-5 text-violet-500" />
-      case "email": return <Mail className="h-5 w-5 text-blue-500" />
+      case "discord_webhook": return <Radio className="h-5 w-5" style={{ color: "#5865F2" }} />
+      case "discord_dm": return <MessageCircle className="h-5 w-5" style={{ color: "#5865F2" }} />
+      case "email": return <Mail className="h-5 w-5" style={{ color: "#C05B2E" }} />
       default: return <Radio className="h-5 w-5" />
     }
   }
 
   const getChannelTypeLabel = (type: string) => {
     switch (type) {
-      case "discord_webhook": return "Discord Webhook"
+      case "discord_webhook": return "Salon Discord"
       case "discord_dm": return "MP Discord"
       case "email": return "Email"
       default: return type
@@ -181,131 +198,174 @@ export default function AdminChannelsPage() {
     return ""
   }
 
+  const labelPlaceholder =
+    formType === "discord_webhook" ? "ex: #annonces"
+    : formType === "discord_dm" ? "ex: MP aux joueurs"
+    : "ex: Contact du club"
+
+  const submitDisabled =
+    saving ||
+    (formType === "discord_webhook" ? !formWebhookUrl
+      : formType === "discord_dm" ? (formDmRecipient === "fixed" && !formDiscordUserId.trim())
+      : !formEmail)
+
   if (clubLoading || !selectedClub || loading) {
-    return <div className="space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-24" /><Skeleton className="h-24" /></div>
+    return <div className="mx-auto max-w-[760px] space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-24" /><Skeleton className="h-24" /></div>
   }
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-[760px]">
       <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="font-serif text-2xl font-medium">Canaux</h1>
-          <p className="text-sm text-muted-foreground mt-1">Les destinations où vos notifications sont envoyées.</p>
-        </div>
-        <Button onClick={openCreate}><Plus className="h-4 w-4 mr-2" />Ajouter un canal</Button>
+        <h1 className="font-serif text-[26px] font-medium">Canaux</h1>
+        <Button onClick={openCreate} className="shrink-0"><Plus className="mr-2 h-4 w-4" />Ajouter un canal</Button>
       </div>
+      <p className="mb-6 mt-1 text-sm text-muted-foreground">Les destinations où vos notifications sont envoyées.</p>
 
+      {/* ===================== Modale Nouveau / Modifier canal ===================== */}
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm() }}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[440px]">
           <DialogHeader>
             <DialogTitle>{isEditing ? "Modifier le canal" : "Nouveau canal"}</DialogTitle>
-            <DialogDescription>
-              {isEditing
-                ? "Modifiez le nom ou la destination de ce canal. Les workflows qui l'utilisent ne sont pas impactés."
-                : "Une destination vers laquelle vos workflows pourront envoyer des notifications."}
-            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Type</Label>
-              <Select value={formType} onValueChange={setFormType} disabled={isEditing}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="discord_webhook">Discord Webhook (salon)</SelectItem>
-                  <SelectItem value="discord_dm">MP Discord (message privé)</SelectItem>
-                  <SelectItem value="email">Email</SelectItem>
-                </SelectContent>
-              </Select>
-              {isEditing && (
-                <p className="text-xs text-muted-foreground">
-                  Le type n&apos;est pas modifiable. Pour changer de type, créez un nouveau canal.
-                </p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label>Label (optionnel)</Label>
-              <Input placeholder={formType === "discord_webhook" ? "ex: #notifications" : "ex: Contact organisation"} value={formLabel} onChange={(e) => setFormLabel(e.target.value)} />
-            </div>
-            {formType === "discord_webhook" && (
-              <div className="space-y-2">
-                <Label>URL du Webhook</Label>
-                <Input placeholder="https://discord.com/api/webhooks/..." value={formWebhookUrl} onChange={(e) => setFormWebhookUrl(e.target.value)} />
-                <p className="text-xs text-muted-foreground">Paramètres du serveur &gt; Intégrations &gt; Webhooks</p>
+
+          <div className="space-y-4 py-1">
+            {/* Puces de type (création seulement) */}
+            {!isEditing && (
+              <div className="flex gap-2">
+                {TYPES.map((t) => {
+                  const active = formType === t.value
+                  return (
+                    <button
+                      key={t.value}
+                      type="button"
+                      onClick={() => setFormType(t.value)}
+                      className={`flex flex-1 items-center justify-center gap-2 rounded-lg border px-2 py-2 text-[12.5px] font-semibold transition-colors ${
+                        active
+                          ? "border-[color:var(--qt-copper-500)] bg-[color:var(--qt-copper-500)]/[0.08] text-foreground"
+                          : "border-[color:var(--qt-sable-300,#DAD4C6)] text-muted-foreground hover:bg-secondary/50"
+                      }`}
+                    >
+                      <span className="h-2.5 w-2.5 rounded-sm" style={{ background: t.dot }} />
+                      {t.label}
+                    </button>
+                  )
+                })}
               </div>
             )}
-            {formType === "discord_dm" && (
-              <>
-                <div className="space-y-2">
-                  <Label>Destinataire</Label>
-                  <Select value={formDmRecipient} onValueChange={setFormDmRecipient} disabled={isEditing}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="member">Le membre concerné par l&apos;événement</SelectItem>
-                      <SelectItem value="fixed">Une personne précise</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {formDmRecipient === "member" && (
-                    <p className="text-xs text-muted-foreground">
-                      Aucun identifiant à saisir : le hub envoie le MP au membre concerné par l&apos;événement,
-                      reconnu automatiquement via son compte Discord. C&apos;est le mode recommandé pour notifier vos membres.
-                    </p>
-                  )}
+
+            {/* --- Salon Discord (webhook) --- */}
+            {formType === "discord_webhook" && (
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label className="block text-[12.5px] font-semibold text-foreground/80">Nom du canal</label>
+                  <Input placeholder={labelPlaceholder} value={formLabel} onChange={(e) => setFormLabel(e.target.value)} />
                 </div>
-                {formDmRecipient === "fixed" && (
-                  <div className="space-y-2">
-                    <Label>ID Discord du destinataire</Label>
-                    <Input placeholder="ex: 137245874929861234" value={formDiscordUserId} onChange={(e) => setFormDiscordUserId(e.target.value)} />
-                    <p className="text-xs text-muted-foreground">
-                      Pour notifier toujours la même personne (capitaine, admin…). Clic droit sur le membre &gt;
-                      « Copier l&apos;identifiant » (mode développeur requis).
-                    </p>
-                  </div>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Le bot Notify doit être présent sur votre serveur Discord (voir Paramètres).
-                </p>
-              </>
+                <div className="space-y-1.5">
+                  <label className="block text-[12.5px] font-semibold text-foreground/80">URL du webhook</label>
+                  <Input placeholder="https://discord.com/api/webhooks/…" value={formWebhookUrl} onChange={(e) => setFormWebhookUrl(e.target.value)} />
+                  <p className="text-[11.5px] text-muted-foreground">Le webhook poste dans un salon. Paramètres du serveur › Intégrations › Webhooks.</p>
+                </div>
+              </div>
             )}
+
+            {/* --- MP joueur (discord_dm) --- */}
+            {formType === "discord_dm" && (
+              <div className="space-y-3">
+                <p className="text-[13px] leading-relaxed text-muted-foreground">
+                  Le bot envoie un <strong className="font-semibold text-foreground">message privé</strong> directement
+                  au joueur concerné par l&apos;événement. Invitez-le une fois sur le serveur Discord de votre
+                  communauté — il pourra ensuite écrire aux membres.
+                </p>
+
+                {BOT_INVITE_URL ? (
+                  <a
+                    href={BOT_INVITE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex w-full items-center justify-center gap-2.5 rounded-[9px] px-3 py-3 text-[13.5px] font-semibold text-white"
+                    style={{ background: "#5865F2" }}
+                  >
+                    <DiscordGlyph className="h-[18px] w-[18px]" />Inviter le bot sur Discord
+                  </a>
+                ) : (
+                  <p className="text-[11.5px] text-muted-foreground">
+                    Lien d&apos;invitation indisponible (NEXT_PUBLIC_DISCORD_APP_ID non configuré).
+                  </p>
+                )}
+                <p className="text-[11.5px] leading-relaxed text-muted-foreground">
+                  Vous serez redirigé vers Discord pour autoriser le bot sur votre serveur. Aucune permission de
+                  modération n&apos;est demandée.
+                </p>
+
+                <div className="space-y-1.5">
+                  <label className="block text-[12.5px] font-semibold text-foreground/80">Nom du canal</label>
+                  <Input placeholder={labelPlaceholder} value={formLabel} onChange={(e) => setFormLabel(e.target.value)} />
+                </div>
+
+                {/* Option avancée : notifier toujours la même personne (capitaine, admin…). */}
+                {formDmRecipient === "fixed" ? (
+                  <div className="space-y-1.5">
+                    <label className="block text-[12.5px] font-semibold text-foreground/80">ID Discord du destinataire</label>
+                    <Input placeholder="ex: 137245874929861234" value={formDiscordUserId} onChange={(e) => setFormDiscordUserId(e.target.value)} />
+                    <button
+                      type="button"
+                      onClick={() => { setFormDmRecipient("member"); setFormDiscordUserId("") }}
+                      className="text-[11.5px] font-medium text-[color:var(--qt-copper-500)] hover:underline"
+                    >
+                      ← Revenir au membre concerné
+                    </button>
+                  </div>
+                ) : !isEditing ? (
+                  <button
+                    type="button"
+                    onClick={() => setFormDmRecipient("fixed")}
+                    className="text-[11.5px] font-medium text-muted-foreground hover:text-foreground hover:underline"
+                  >
+                    Notifier plutôt une personne précise (ID Discord)
+                  </button>
+                ) : null}
+              </div>
+            )}
+
+            {/* --- Email --- */}
             {formType === "email" && (
-              <div className="space-y-2">
-                <Label>Adresse email</Label>
-                <Input type="email" placeholder="contact@monorg.fr" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} />
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label className="block text-[12.5px] font-semibold text-foreground/80">Nom du canal</label>
+                  <Input placeholder={labelPlaceholder} value={formLabel} onChange={(e) => setFormLabel(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-[12.5px] font-semibold text-foreground/80">Adresse email</label>
+                  <Input type="email" placeholder="contact@monclub.fr" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} />
+                </div>
               </div>
             )}
           </div>
+
           <DialogFooter>
             <DialogClose asChild><Button variant="outline">Annuler</Button></DialogClose>
-            <Button
-              onClick={handleSubmit}
-              disabled={
-                saving ||
-                (formType === "discord_webhook" ? !formWebhookUrl
-                  : formType === "discord_dm" ? (formDmRecipient === "fixed" && !formDiscordUserId.trim())
-                  : !formEmail)
-              }
-            >
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {isEditing ? "Enregistrer" : "Créer"}
+            <Button onClick={handleSubmit} disabled={submitDisabled}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isEditing ? "Enregistrer" : "Créer le canal"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* ===================== Liste des canaux ===================== */}
       {channels.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="py-12 text-center">
-            <Radio className="h-10 w-10 mx-auto text-muted-foreground mb-4" />
-            <h3 className="font-semibold mb-2">Aucun canal configuré</h3>
-            <p className="text-sm text-muted-foreground mb-4">Ajoutez un webhook Discord ou une adresse email pour commencer.</p>
-            <Button onClick={openCreate}><Plus className="h-4 w-4 mr-2" />Ajouter un canal</Button>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-dashed border-[color:var(--qt-sable-300,#DAD4C6)] bg-card py-12 text-center">
+          <Radio className="mx-auto mb-4 h-10 w-10 text-muted-foreground" />
+          <h3 className="mb-2 font-semibold">Aucun canal configuré</h3>
+          <p className="mx-auto mb-4 max-w-sm text-sm text-muted-foreground">Ajoutez un salon Discord ou une adresse email pour commencer.</p>
+          <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" />Ajouter un canal</Button>
+        </div>
       ) : (
         <div className="space-y-2.5">
           {channels.map((channel) => (
-            <Card key={channel.id} className="p-4">
+            <div key={channel.id} className="rounded-xl border border-[color:var(--qt-sable-300,#DAD4C6)] bg-card px-4 py-[15px]">
               <div className="flex items-center gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-secondary">
+                <span className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px] bg-secondary">
                   {getChannelIcon(channel.type)}
                 </span>
                 <div className="min-w-0 flex-1">
@@ -322,7 +382,7 @@ export default function AdminChannelsPage() {
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-[color:var(--qt-danger,#B5402F)]"><Trash2 className="h-4 w-4" /></Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
@@ -336,7 +396,7 @@ export default function AdminChannelsPage() {
                   </AlertDialogContent>
                 </AlertDialog>
               </div>
-            </Card>
+            </div>
           ))}
         </div>
       )}
