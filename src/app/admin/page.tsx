@@ -5,62 +5,51 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useClub } from "@/lib/contexts/club-context"
-import { FlowDiagram } from "@/components/flow-diagram"
+import { createClient } from "@/lib/supabase/client"
+import { DiscordLoginButton } from "@/components/discord-login-button"
 import { toast } from "sonner"
 import Link from "next/link"
-import { DiscordLoginButton } from "@/components/discord-login-button"
-import { Radio, Workflow, ScrollText, AlertCircle, CheckCircle, CheckCircle2, XCircle, ArrowRight, Bell, Mail, Palette, Sparkles, Users, ShieldCheck } from "lucide-react"
+import { Bell, Mail, Palette, Sparkles, Users, ShieldCheck, AlertCircle } from "lucide-react"
 
 interface DashboardData {
-  events_count: number
-  workflows_count: number
-  channels_count: number
-  recent_logs: Array<{
-    id: string
-    event_slug: string
-    status: string
-    created_at: string
-  }>
+  active_workflows: number
+  sent_7d: number
+  success_rate: number | null
+  to_configure: { label: string; color: string }[]
+  activity: { text: string; color: string; time: string }[]
 }
 
 export default function AdminDashboardPage() {
   const { selectedClub, loading: clubLoading, isAuthenticated, clubs } = useClub()
   const orgId = selectedClub?.club_id
-  // Club d'origine passé par l'app partenaire (?org=) — préservé à la connexion.
   const orgParam = typeof window !== "undefined"
     ? new URLSearchParams(window.location.search).get("org")
     : null
   const dateLabel = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })
+
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [adminName, setAdminName] = useState<string | null>(null)
+
+  useEffect(() => {
+    const sb = createClient()
+    sb.auth.getUser().then(({ data }) => {
+      const u = data.user
+      if (!u) return
+      const m = (u.user_metadata || {}) as Record<string, string>
+      const full = m.full_name || m.name || u.email || ""
+      setAdminName(full.split(" ")[0] || full.split("@")[0] || null)
+    })
+  }, [])
 
   const fetchData = useCallback(async () => {
     if (!orgId) { setLoading(false); return }
     try {
-      const [eventsRes, workflowsRes, channelsRes, logsRes] = await Promise.all([
-        fetch(`/api/admin/events?org_id=${orgId}`),
-        fetch(`/api/admin/workflows?org_id=${orgId}`),
-        fetch(`/api/admin/channels?org_id=${orgId}`),
-        fetch(`/api/admin/logs?org_id=${orgId}&limit=5`),
-      ])
-
-      const events = eventsRes.ok ? await eventsRes.json() : { events: [] }
-      const workflows = workflowsRes.ok ? await workflowsRes.json() : { events_with_workflows: [] }
-      const channels = channelsRes.ok ? await channelsRes.json() : { channels: [] }
-      const logs = logsRes.ok ? await logsRes.json() : { logs: [] }
-
-      const wfCount = workflows.events_with_workflows?.reduce(
-        (sum: number, e: { workflows: unknown[] }) => sum + (e.workflows?.length || 0), 0
-      ) || 0
-
-      setData({
-        events_count: events.events?.length || 0,
-        workflows_count: wfCount,
-        channels_count: channels.channels?.length || 0,
-        recent_logs: logs.logs || [],
-      })
+      const res = await fetch(`/api/admin/dashboard?org_id=${orgId}`)
+      if (!res.ok) throw new Error()
+      setData(await res.json())
     } catch {
-      toast.error("Erreur lors du chargement du dashboard")
+      toast.error("Erreur lors du chargement du tableau de bord")
     } finally {
       setLoading(false)
     }
@@ -76,14 +65,13 @@ export default function AdminDashboardPage() {
       <div className="space-y-6">
         <Skeleton className="h-8 w-64" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
+          <Skeleton className="h-28" /><Skeleton className="h-28" /><Skeleton className="h-28" />
         </div>
       </div>
     )
   }
 
+  // --- Accueil non connecté (landing pédagogique partenaire) ---
   if (!isAuthenticated) {
     return (
       <div className="flex items-center justify-center py-8 px-4">
@@ -136,9 +124,7 @@ export default function AdminDashboardPage() {
       <div className="text-center py-12">
         <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
         <h2 className="text-xl font-semibold mb-2">Aucune organisation</h2>
-        <p className="text-muted-foreground">
-          Vous n&apos;êtes administrateur d&apos;aucune organisation.
-        </p>
+        <p className="text-muted-foreground">Vous n&apos;êtes administrateur d&apos;aucune organisation.</p>
       </div>
     )
   }
@@ -148,9 +134,7 @@ export default function AdminDashboardPage() {
       <div className="text-center py-12">
         <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
         <h2 className="text-xl font-semibold mb-2">Sélectionnez une organisation</h2>
-        <p className="text-muted-foreground">
-          Choisissez une organisation dans le menu en haut de page.
-        </p>
+        <p className="text-muted-foreground">Choisissez une organisation dans le menu en haut de page.</p>
       </div>
     )
   }
@@ -160,162 +144,89 @@ export default function AdminDashboardPage() {
       <div className="space-y-6">
         <Skeleton className="h-8 w-64" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
+          <Skeleton className="h-28" /><Skeleton className="h-28" /><Skeleton className="h-28" />
         </div>
+        <Skeleton className="h-40" />
       </div>
     )
   }
 
+  const successLabel = data?.success_rate == null
+    ? "—"
+    : `${data.success_rate.toFixed(1).replace(".", ",")}%`
+
   return (
     <div className="space-y-8">
+      {/* Header */}
       <div className="space-y-2">
-        <div className="mono-label capitalize">{dateLabel} · {selectedClub.club_name}</div>
-        <h1 className="font-serif text-3xl font-normal">Bonjour.</h1>
-        <p className="max-w-2xl text-sm text-muted-foreground">
-          Vue d&apos;ensemble des notifications de votre organisation : ce qui est configuré et ce qui a été envoyé.
-        </p>
+        <div className="mono-label">{dateLabel} · {selectedClub.club_name}</div>
+        <h1 className="font-serif text-3xl font-normal">Bonjour{adminName ? ` ${adminName}` : ""}.</h1>
       </div>
 
-      {/* Stats */}
+      {/* Stats santé */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="mono-label flex items-center gap-2">
-                <Workflow className="h-3.5 w-3.5" />
-                Notifications actives
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="font-serif text-4xl font-medium leading-none">{data?.workflows_count || 0}</div>
-            <p className="text-xs text-muted-foreground mt-2">
-              sur{" "}
-              <Link href="/admin/events" className="underline underline-offset-2 hover:text-foreground">
-                {data?.events_count || 0} événements disponibles
-              </Link>
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard label="Notifications actives" value={String(data?.active_workflows ?? 0)} />
+        <StatCard label="Envoyées · 7 jours" value={String(data?.sent_7d ?? 0)} />
+        <StatCard label="Taux de succès" value={successLabel} success />
+      </div>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="mono-label flex items-center gap-2">
-                <Radio className="h-3.5 w-3.5" />
-                Canaux configurés
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="font-serif text-4xl font-medium leading-none">{data?.channels_count || 0}</div>
-            {data?.channels_count === 0 && (
-              <Button variant="link" className="px-0 text-sm h-auto mt-1" asChild>
-                <Link href="/admin/channels">Configurer un canal</Link>
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="mono-label flex items-center gap-2">
-                <ScrollText className="h-3.5 w-3.5" />
-                Dernières notifications
-            </div>
-          </CardHeader>
-          <CardContent>
-            {data?.recent_logs && data.recent_logs.length > 0 ? (
-              <div className="space-y-2">
-                {data.recent_logs.map((log) => (
-                  <div key={log.id} className="flex items-center justify-between text-sm">
-                    <span className="truncate mr-2">{log.event_slug}</span>
-                    <span className={`inline-flex items-center gap-1 font-mono text-xs ${log.status === "sent" ? "text-[color:var(--qt-success)]" : "text-destructive"}`}>
-                      {log.status === "sent" ? (
-                        <CheckCircle className="h-3 w-3" />
-                      ) : (
-                        <XCircle className="h-3 w-3" />
-                      )}
-                      {log.status}
-                    </span>
-                  </div>
-                ))}
+      {/* À configurer */}
+      {data?.to_configure && data.to_configure.length > 0 && (
+        <div className="space-y-3">
+          <div className="mono-label text-[color:var(--qt-copper-500)]">
+            À configurer · événements sans notification
+          </div>
+          <div className="space-y-2">
+            {data.to_configure.map((t, i) => (
+              <div key={i} className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3">
+                <span className="h-1.5 w-1.5 rounded-sm shrink-0" style={{ background: t.color }} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold">{t.label}</div>
+                  <div className="text-xs text-muted-foreground">Personne n&apos;est prévenu</div>
+                </div>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/admin/workflows">Configurer</Link>
+                </Button>
               </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Activité récente */}
+      <div className="space-y-3">
+        <div className="mono-label">Activité récente</div>
+        <Card>
+          <CardContent className="px-4 py-1">
+            {data?.activity && data.activity.length > 0 ? (
+              data.activity.map((a, i) => (
+                <div key={i} className="flex items-center gap-3 py-3 border-b last:border-0">
+                  <span className="h-2 w-2 rounded-full shrink-0" style={{ background: a.color }} />
+                  <span className="flex-1 min-w-0 text-sm text-foreground/80 truncate">{a.text}</span>
+                  <span className="font-mono text-xs text-muted-foreground shrink-0">{a.time}</span>
+                </div>
+              ))
             ) : (
-              <p className="text-sm text-muted-foreground">Aucune notification envoyée</p>
+              <p className="py-4 text-sm text-muted-foreground">Aucune notification envoyée pour l&apos;instant.</p>
             )}
           </CardContent>
         </Card>
       </div>
-
-      {/* Comment ça marche */}
-      <Card>
-        <CardHeader className="pb-4">
-          <div className="mono-label mb-1">Comment ça marche</div>
-          <p className="text-sm text-muted-foreground">
-            Vos applications Quatools (BAAS, Cours…) émettent des événements. Vous décidez lesquels
-            déclenchent un message, vers où, et avec quel contenu.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <FlowDiagram />
-          <div className="grid gap-2 sm:grid-cols-3">
-            <OnboardingStep
-              num={1}
-              done={(data?.channels_count || 0) > 0}
-              title="Créez un canal"
-              detail="Webhook Discord ou email : la destination des messages."
-              href="/admin/channels"
-              linkLabel="Gérer les canaux"
-            />
-            <OnboardingStep
-              num={2}
-              done={(data?.workflows_count || 0) > 0}
-              title="Créez un workflow"
-              detail="Choisissez un événement, un canal et rédigez le message."
-              href="/admin/workflows"
-              linkLabel="Gérer les workflows"
-            />
-            <OnboardingStep
-              num={3}
-              done={(data?.recent_logs?.length || 0) > 0}
-              title="Les envois partent seuls"
-              detail="Dès qu'un événement survient, le message est envoyé et tracé."
-              href="/admin/logs"
-              linkLabel="Voir l'historique"
-            />
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }
 
-function OnboardingStep({ num, done, title, detail, href, linkLabel }: {
-  num: number
-  done: boolean
-  title: string
-  detail: string
-  href: string
-  linkLabel: string
-}) {
+function StatCard({ label, value, success }: { label: string; value: string; success?: boolean }) {
   return (
-    <div className={`rounded-lg border p-3 ${done ? "bg-muted/40" : ""}`}>
-      <div className="flex items-center gap-2 mb-1">
-        {done ? (
-          <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-        ) : (
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-xs font-semibold text-muted-foreground">
-            {num}
-          </span>
-        )}
-        <span className={`text-sm font-semibold ${done ? "text-muted-foreground" : ""}`}>{title}</span>
-      </div>
-      <p className="text-xs text-muted-foreground leading-relaxed mb-2">{detail}</p>
-      <Button variant="link" size="sm" className="h-auto px-0 text-xs" asChild>
-        <Link href={href}>
-          {linkLabel}
-          <ArrowRight className="h-3 w-3 ml-1" />
-        </Link>
-      </Button>
-    </div>
+    <Card>
+      <CardHeader className="pb-1">
+        <div className="mono-label">{label}</div>
+      </CardHeader>
+      <CardContent>
+        <div className={`font-serif text-4xl font-medium leading-none ${success ? "text-[color:var(--qt-success)]" : ""}`}>
+          {value}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
