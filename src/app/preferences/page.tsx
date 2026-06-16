@@ -150,7 +150,7 @@ function PreferencesContent() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Mes notifications</h1>
+        <h1 className="font-serif text-2xl font-medium">Mes notifications</h1>
         <p className="text-muted-foreground mt-1">
           Voici ce qui vous est envoyé, et sur quels canaux. Un même événement peut partir sur plusieurs
           canaux&nbsp;: activez ou désactivez chacun comme vous le souhaitez.
@@ -171,7 +171,7 @@ function PreferencesContent() {
         <>
           {categories.map(({ category, events }) => (
             <div key={category}>
-              <h2 className="text-lg font-semibold mb-3">{category}</h2>
+              <h2 className="mono-label mb-3">{category}</h2>
               <div className="space-y-3">
                 {events.map((ev) => (
                   <Card key={ev.label} className="overflow-hidden">

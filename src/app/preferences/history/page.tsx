@@ -89,7 +89,7 @@ function HistoryContent() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Historique</h1>
+        <h1 className="font-serif text-2xl font-medium">Historique</h1>
         <p className="text-muted-foreground mt-1">
           Les notifications qui vous ont été envoyées, et par quel canal.
         </p>

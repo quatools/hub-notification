@@ -112,7 +112,7 @@ function UserChannelsContent() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Mes canaux de réception</h1>
+          <h1 className="font-serif text-2xl font-medium">Mes canaux de réception</h1>
           <p className="text-muted-foreground mt-1">
             Vos propres adresses pour y rerouter vos notifications. Email pour l&apos;instant ; connexion
             d&apos;autres comptes (Discord, Google…) à venir.
