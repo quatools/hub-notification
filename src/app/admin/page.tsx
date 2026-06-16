@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useClub } from "@/lib/contexts/club-context"
@@ -31,6 +30,7 @@ export default function AdminDashboardPage() {
   const orgParam = typeof window !== "undefined"
     ? new URLSearchParams(window.location.search).get("org")
     : null
+  const dateLabel = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -169,9 +169,10 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold">Dashboard — {selectedClub.club_name}</h1>
+    <div className="space-y-8">
+      <div className="space-y-2">
+        <div className="mono-label capitalize">{dateLabel} · {selectedClub.club_name}</div>
+        <h1 className="font-serif text-3xl font-normal">Bonjour.</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
           Vue d&apos;ensemble des notifications de votre organisation : ce qui est configuré et ce qui a été envoyé.
         </p>
@@ -181,35 +182,14 @@ export default function AdminDashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Radio className="h-4 w-4" />
-                Canaux configurés
-              </div>
-            </CardTitle>
+            <div className="mono-label flex items-center gap-2">
+                <Workflow className="h-3.5 w-3.5" />
+                Notifications actives
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{data?.channels_count || 0}</div>
-            {data?.channels_count === 0 && (
-              <Button variant="link" className="px-0 text-sm" asChild>
-                <Link href="/admin/channels">Configurer un canal</Link>
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Workflow className="h-4 w-4" />
-                Workflows actifs
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{data?.workflows_count || 0}</div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <div className="font-serif text-4xl font-medium leading-none">{data?.workflows_count || 0}</div>
+            <p className="text-xs text-muted-foreground mt-2">
               sur{" "}
               <Link href="/admin/events" className="underline underline-offset-2 hover:text-foreground">
                 {data?.events_count || 0} événements disponibles
@@ -220,12 +200,27 @@ export default function AdminDashboardPage() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <ScrollText className="h-4 w-4" />
+            <div className="mono-label flex items-center gap-2">
+                <Radio className="h-3.5 w-3.5" />
+                Canaux configurés
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="font-serif text-4xl font-medium leading-none">{data?.channels_count || 0}</div>
+            {data?.channels_count === 0 && (
+              <Button variant="link" className="px-0 text-sm h-auto mt-1" asChild>
+                <Link href="/admin/channels">Configurer un canal</Link>
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="mono-label flex items-center gap-2">
+                <ScrollText className="h-3.5 w-3.5" />
                 Dernières notifications
-              </div>
-            </CardTitle>
+            </div>
           </CardHeader>
           <CardContent>
             {data?.recent_logs && data.recent_logs.length > 0 ? (
@@ -233,14 +228,14 @@ export default function AdminDashboardPage() {
                 {data.recent_logs.map((log) => (
                   <div key={log.id} className="flex items-center justify-between text-sm">
                     <span className="truncate mr-2">{log.event_slug}</span>
-                    <Badge variant={log.status === "sent" ? "default" : "destructive"} className="text-xs">
+                    <span className={`inline-flex items-center gap-1 font-mono text-xs ${log.status === "sent" ? "text-[color:var(--qt-success)]" : "text-destructive"}`}>
                       {log.status === "sent" ? (
-                        <CheckCircle className="h-3 w-3 mr-1" />
+                        <CheckCircle className="h-3 w-3" />
                       ) : (
-                        <XCircle className="h-3 w-3 mr-1" />
+                        <XCircle className="h-3 w-3" />
                       )}
                       {log.status}
-                    </Badge>
+                    </span>
                   </div>
                 ))}
               </div>
@@ -254,7 +249,7 @@ export default function AdminDashboardPage() {
       {/* Comment ça marche */}
       <Card>
         <CardHeader className="pb-4">
-          <CardTitle className="text-base">Comment ça marche</CardTitle>
+          <div className="mono-label mb-1">Comment ça marche</div>
           <p className="text-sm text-muted-foreground">
             Vos applications Quatools (BAAS, Cours…) émettent des événements. Vous décidez lesquels
             déclenchent un message, vers où, et avec quel contenu.
