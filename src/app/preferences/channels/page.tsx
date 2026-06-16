@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -10,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { useClub } from "@/lib/contexts/club-context"
 import { toast } from "sonner"
-import { Plus, Mail, Trash2, Loader2, LogIn } from "lucide-react"
+import { Plus, Trash2, Loader2, LogIn } from "lucide-react"
 
 interface UserChannel {
   id: string
@@ -18,6 +17,17 @@ interface UserChannel {
   label: string | null
   config: Record<string, unknown>
   created_at: string
+}
+
+const SOON = ["SMS", "WhatsApp", "Slack", "Telegram", "Notification push", "Webhook"]
+
+function vignetteForChannel(channel: UserChannel): { bg: string; initial: string } {
+  const email = (channel.config.email as string | undefined) || ""
+  if (channel.type === "email") {
+    return { bg: "#24405E", initial: email ? "@" : "@" }
+  }
+  const source = channel.label || email
+  return { bg: "#24405E", initial: (source.charAt(0) || "?").toUpperCase() }
 }
 
 function UserChannelsContent() {
@@ -94,7 +104,7 @@ function UserChannelsContent() {
       <div className="text-center py-12">
         <LogIn className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
         <h2 className="text-xl font-semibold mb-2">Connexion requise</h2>
-        <p className="text-muted-foreground">Connectez-vous pour gérer vos canaux.</p>
+        <p className="text-muted-foreground">Connectez-vous pour gérer vos comptes.</p>
       </div>
     )
   }
@@ -109,18 +119,14 @@ function UserChannelsContent() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-serif text-2xl font-medium">Mes canaux de réception</h1>
-          <p className="text-muted-foreground mt-1">
-            Vos propres adresses pour y rerouter vos notifications. Email pour l&apos;instant ; connexion
-            d&apos;autres comptes (Discord, Google…) à venir.
-          </p>
-        </div>
+    <div className="max-w-[720px] mx-auto py-8">
+      <div className="flex items-start justify-between gap-4">
+        <h1 className="font-serif text-[26px] font-medium">Mes comptes</h1>
         <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) { setNewLabel(""); setNewEmail("") } }}>
           <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" />Ajouter un email</Button>
+            <Button className="bg-[#24405E] text-white hover:bg-[#24405E]/90 shrink-0">
+              <Plus className="h-4 w-4 mr-2" />Ajouter un email
+            </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -149,7 +155,7 @@ function UserChannelsContent() {
               <DialogClose asChild>
                 <Button variant="outline">Annuler</Button>
               </DialogClose>
-              <Button onClick={handleCreate} disabled={creating || !newEmail}>
+              <Button onClick={handleCreate} disabled={creating || !newEmail} className="bg-[#24405E] text-white hover:bg-[#24405E]/90">
                 {creating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Ajouter
               </Button>
@@ -158,63 +164,81 @@ function UserChannelsContent() {
         </Dialog>
       </div>
 
+      <p className="text-sm text-muted-foreground mb-6">
+        Connectez vos comptes pour recevoir vos notifications là où vous êtes.
+      </p>
+
       {channels.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="py-12 text-center">
-            <Mail className="h-10 w-10 mx-auto text-muted-foreground mb-4" />
-            <h3 className="font-semibold mb-2">Aucun canal personnel</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Ajoutez une adresse email pour recevoir des notifications personnalisées.
-            </p>
-            <Button onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />Ajouter un email
-            </Button>
-          </CardContent>
-        </Card>
+        <p className="text-sm text-muted-foreground mb-7">Aucun compte pour l&apos;instant.</p>
       ) : (
-        <div className="space-y-3">
-          {channels.map((channel) => (
-            <Card key={channel.id}>
-              <CardHeader className="py-3 px-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Mail className="h-5 w-5 text-blue-500" />
-                    <div>
-                      <CardTitle className="text-base">
-                        {channel.label || "Email"}
-                      </CardTitle>
-                      <p className="text-sm text-muted-foreground">
-                        {channel.config.email as string}
-                      </p>
-                    </div>
-                  </div>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Supprimer ce canal ?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Vous ne recevrez plus de notifications sur cette adresse.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Annuler</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handleDelete(channel.id)}>
-                          Supprimer
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+        <div className="flex flex-col gap-2.5 mb-7">
+          {channels.map((channel) => {
+            const { bg, initial } = vignetteForChannel(channel)
+            return (
+              <div
+                key={channel.id}
+                className="bg-white border border-[#DAD4C6] rounded-xl px-4 py-3.5 flex items-center gap-3"
+              >
+                <div
+                  className="w-[38px] h-[38px] rounded-[10px] flex items-center justify-center text-white font-bold text-sm shrink-0"
+                  style={{ background: bg }}
+                >
+                  {initial}
                 </div>
-              </CardHeader>
-            </Card>
-          ))}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold">{channel.label || "Email"}</div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {channel.config.email as string}
+                  </div>
+                </div>
+                <span
+                  className="mono-label text-[10px] rounded-full px-2 py-0.5"
+                  style={{
+                    background: "color-mix(in srgb, #2F7D5B 12%, white)",
+                    color: "#2F7D5B",
+                  }}
+                >
+                  Vérifié
+                </span>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-[#B5402F]">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Supprimer ce compte ?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Vous ne recevrez plus de notifications sur cette adresse.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Annuler</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleDelete(channel.id)}>
+                        Supprimer
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            )
+          })}
         </div>
       )}
+
+      <div className="mono-label mb-3">Bientôt · le hub se connecte à tout</div>
+      <div className="flex flex-wrap gap-2">
+        {SOON.map((name) => (
+          <span
+            key={name}
+            className="inline-flex items-center gap-2 rounded-full border border-dashed border-[#DAD4C6] px-3 py-1.5 text-xs text-muted-foreground"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-[#C9CDD6]" />
+            {name}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }

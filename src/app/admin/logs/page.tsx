@@ -4,11 +4,17 @@ import { useEffect, useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { MessagePreview } from "@/components/message-preview"
 import { useClub } from "@/lib/contexts/club-context"
 import { toast } from "sonner"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, X, AlertTriangle } from "lucide-react"
+
+interface RenderedContent {
+  subject: string | null
+  body: string
+  format: string
+  channel_type: string | null
+}
 
 interface LogEntry {
   id: string
@@ -19,7 +25,7 @@ interface LogEntry {
   org_id: string | null
   status: string
   payload: Record<string, unknown> | null
-  rendered_content: Record<string, unknown> | null
+  rendered_content: RenderedContent | null
   error_message: string | null
   attempts: number
   sent_at: string | null
@@ -38,7 +44,8 @@ const FILTERS = [
 
 function chanWord(type?: string | null) {
   if (type === "email") return "Email"
-  if (type === "discord_webhook" || type === "discord_dm") return "Discord"
+  if (type === "discord_webhook") return "Discord"
+  if (type === "discord_dm") return "MP Discord"
   return "Notification"
 }
 
@@ -53,6 +60,29 @@ function statusLabel(status: string) {
   if (status === "failed") return "Échec"
   if (status === "pending") return "En attente"
   return status
+}
+
+function StatusPill({ status }: { status: string }) {
+  const base = "rounded-full px-2 py-0.5 text-[10px] font-mono"
+  if (status === "sent") {
+    return (
+      <span className={base} style={{ background: "color-mix(in srgb,#2F7D5B 12%,white)", color: "#2F7D5B" }}>
+        Envoyé
+      </span>
+    )
+  }
+  if (status === "failed") {
+    return (
+      <span className={base} style={{ background: "color-mix(in srgb,#B5402F 12%,white)", color: "#B5402F" }}>
+        Échec
+      </span>
+    )
+  }
+  return (
+    <span className={`${base} bg-muted`} style={{ color: "#9197A1" }}>
+      En attente
+    </span>
+  )
 }
 
 function dayLabel(iso: string) {
@@ -97,6 +127,14 @@ function LogsContent() {
   useEffect(() => { fetchLogs() }, [fetchLogs])
   useEffect(() => { setOffset(0) }, [statusFilter])
 
+  // Fermeture du drawer avec Escape
+  useEffect(() => {
+    if (!detailLog) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setDetailLog(null) }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [detailLog])
+
   const formatDate = (s: string) =>
     new Date(s).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
   const formatTime = (s: string) =>
@@ -118,29 +156,35 @@ function LogsContent() {
     return <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
   }
 
+  const rc = detailLog?.rendered_content || null
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="font-serif text-2xl font-medium">Historique</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Chaque notification envoyée par vos règles. Cliquez pour voir le détail.
+            Chaque notification envoyée par vos règles. Cliquez pour voir le message exact reçu.
           </p>
         </div>
         <div className="flex gap-1.5">
-          {FILTERS.map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setStatusFilter(f.key)}
-              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                statusFilter === f.key
-                  ? "border-transparent bg-primary text-primary-foreground"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
+          {FILTERS.map((f) => {
+            const active = statusFilter === f.key
+            return (
+              <button
+                key={f.key}
+                onClick={() => setStatusFilter(f.key)}
+                className={`rounded-lg border px-3 py-1.5 text-xs transition-colors ${
+                  active
+                    ? "border-[color:var(--qt-copper-500)] text-foreground font-semibold"
+                    : "border-[#DAD4C6] text-muted-foreground hover:text-foreground font-medium"
+                }`}
+                style={active ? { background: "color-mix(in srgb,#C05B2E 9%,white)" } : undefined}
+              >
+                {f.label}
+              </button>
+            )
+          })}
         </div>
       </div>
 
@@ -162,11 +206,10 @@ function LogsContent() {
                   >
                     <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: statusColor(log.status) }} />
                     <span className="min-w-0 flex-1 truncate text-sm text-foreground/80">
-                      {chanWord(log.channels?.type)} «&nbsp;{log.events?.label || log.event_slug}&nbsp;»
-                      {log.channels?.label ? ` · ${log.channels.label}` : ""}
-                      {log.is_test ? " · test" : ""}
+                      {chanWord(log.channels?.type)} «&nbsp;{log.events?.label || log.event_slug}&nbsp;» → {log.destination || "—"}
+                      {log.is_test ? <span className="text-muted-foreground"> · test</span> : null}
                     </span>
-                    <span className="mono-label shrink-0" style={{ color: statusColor(log.status) }}>{statusLabel(log.status)}</span>
+                    <StatusPill status={log.status} />
                     <span className="shrink-0 font-mono text-xs text-muted-foreground">{formatTime(log.created_at)}</span>
                     <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
                   </div>
@@ -192,43 +235,88 @@ function LogsContent() {
         </>
       )}
 
-      {/* Détail */}
-      <Dialog open={!!detailLog} onOpenChange={() => setDetailLog(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="font-serif font-medium">Détail de la notification</DialogTitle>
-          </DialogHeader>
-          {detailLog && (
-            <ScrollArea className="max-h-[60vh]">
-              <div className="space-y-4 py-2">
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><p className="mono-label mb-1">Événement</p><p className="font-medium">{detailLog.events?.label || detailLog.event_slug}</p></div>
-                  <div><p className="mono-label mb-1">Statut</p><p className="font-medium" style={{ color: statusColor(detailLog.status) }}>{statusLabel(detailLog.status)}</p></div>
-                  <div><p className="mono-label mb-1">Canal</p><p className="font-medium">{detailLog.channels?.label || detailLog.channels?.type || "—"}</p></div>
-                  {detailLog.destination && (
-                    <div><p className="mono-label mb-1">Destinataire</p><p className="font-medium truncate">{detailLog.destination}</p></div>
-                  )}
-                  <div><p className="mono-label mb-1">Date</p><p className="font-medium">{formatDate(detailLog.created_at)}</p></div>
-                  <div><p className="mono-label mb-1">Tentatives</p><p className="font-medium">{detailLog.attempts}</p></div>
-                </div>
+      {/* Détail — drawer latéral droit */}
+      {detailLog && (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-[rgba(21,24,30,0.34)]" onClick={() => setDetailLog(null)} />
+          <div className="absolute top-0 right-0 bottom-0 flex w-[460px] max-w-[90vw] flex-col bg-card shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b px-5 py-4">
+              <h3 className="font-serif text-lg font-medium">Détail de l'envoi</h3>
+              <button
+                onClick={() => setDetailLog(null)}
+                className="rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
+                aria-label="Fermer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
 
-                {detailLog.error_message && (
-                  <div>
-                    <p className="mono-label mb-1">Erreur</p>
-                    <pre className="whitespace-pre-wrap rounded-md bg-destructive/10 p-3 text-sm text-destructive">{detailLog.error_message}</pre>
+            {/* Body */}
+            <div className="flex-1 overflow-auto p-5">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-4">
+                <div>
+                  <div className="mono-label mb-1">ÉVÉNEMENT</div>
+                  <div className="text-[13.5px] font-semibold">{detailLog.events?.label || detailLog.event_slug}</div>
+                </div>
+                <div>
+                  <div className="mono-label mb-1">STATUT</div>
+                  <div className="text-[13.5px] font-semibold"><StatusPill status={detailLog.status} /></div>
+                </div>
+                <div>
+                  <div className="mono-label mb-1">CANAL</div>
+                  <div className="text-[13.5px] font-semibold">
+                    {chanWord(detailLog.channels?.type)}{detailLog.channels?.label ? ` · ${detailLog.channels.label}` : ""}
                   </div>
-                )}
-                {detailLog.payload && (
-                  <div>
-                    <p className="mono-label mb-1">Données</p>
-                    <pre className="overflow-x-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-xs">{JSON.stringify(detailLog.payload, null, 2)}</pre>
-                  </div>
-                )}
+                </div>
+                <div>
+                  <div className="mono-label mb-1">DESTINATAIRE</div>
+                  <div className="truncate text-[13.5px] font-semibold">{detailLog.destination || "—"}</div>
+                </div>
+                <div>
+                  <div className="mono-label mb-1">DATE</div>
+                  <div className="text-[13.5px] font-semibold">{formatDate(detailLog.created_at)}</div>
+                </div>
               </div>
-            </ScrollArea>
-          )}
-        </DialogContent>
-      </Dialog>
+
+              {detailLog.status === "failed" && detailLog.error_message && (
+                <div
+                  className="mt-5 mb-5 flex gap-2.5 rounded-lg border px-3.5 py-3"
+                  style={{
+                    borderColor: "color-mix(in srgb,#B5402F 26%,white)",
+                    background: "color-mix(in srgb,#B5402F 6%,white)",
+                  }}
+                >
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#B5402F]" />
+                  <p className="text-xs text-[#7A4039]">{detailLog.error_message}</p>
+                </div>
+              )}
+
+              <div className="mono-label mb-2 mt-5">Contenu envoyé</div>
+              {rc ? (
+                <MessagePreview
+                  channelType={rc.channel_type}
+                  format={rc.format}
+                  subject={rc.subject || ""}
+                  body={rc.body}
+                  values={{}}
+                  eventLabel={detailLog.events?.label || detailLog.event_slug}
+                  eventCategory={detailLog.events?.category || "system"}
+                  senderName={null}
+                  fromEmail={detailLog.destination || ""}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">Aperçu du contenu indisponible pour cet envoi.</p>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="border-t px-5 py-3">
+              <Button variant="outline" onClick={() => setDetailLog(null)}>Fermer</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

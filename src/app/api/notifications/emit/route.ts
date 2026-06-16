@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateApiKey } from '@/lib/auth/api-key'
 import { createServiceClient } from '@/lib/supabase/server'
 import { resolveRoutes, type RouteResult } from '@/lib/notifications/routing'
+import { renderTemplate } from '@/lib/notifications/templates'
 import { getSenderIdentity } from '@/lib/notifications/sender'
 import { resolveRecipient } from '@/lib/notifications/recipients'
 import { mintUnsubToken } from '@/lib/notifications/unsubscribe-token'
@@ -122,6 +123,32 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // 4d. Préférences membre (Phase 3) : « ne pas déranger », compte par défaut,
+  // et préférence par événement (activation + compte de réception choisi).
+  // Backward-compatible : sans ligne de préférence, le comportement est inchangé.
+  const recipientMeta = new Map<string, { dnd: boolean; defaultChannelId: string | null }>()
+  const eventPrefByRecipient = new Map<string, { isEnabled: boolean; channelId: string | null }>()
+  if (members.length > 0) {
+    const memberIds = members.map((m) => m.recipientId)
+    const { data: recRows } = await supabase
+      .schema('notifications')
+      .from('recipients')
+      .select('id, dnd_enabled, default_channel_id')
+      .in('id', memberIds)
+    for (const r of (recRows || []) as { id: string; dnd_enabled: boolean; default_channel_id: string | null }[]) {
+      recipientMeta.set(r.id, { dnd: !!r.dnd_enabled, defaultChannelId: r.default_channel_id })
+    }
+    const { data: prefRows } = await supabase
+      .schema('notifications')
+      .from('recipient_event_prefs')
+      .select('recipient_id, is_enabled, channel_id')
+      .eq('event_id', notifEvent.id)
+      .in('recipient_id', memberIds)
+    for (const p of (prefRows || []) as { recipient_id: string; is_enabled: boolean; channel_id: string | null }[]) {
+      eventPrefByRecipient.set(p.recipient_id, { isEnabled: p.is_enabled, channelId: p.channel_id })
+    }
+  }
+
   // 5. Résoudre les routes via les workflows
   const routes = await resolveRoutes(notifEvent, body.org_id, body.target_users)
 
@@ -159,11 +186,26 @@ export async function POST(request: NextRequest) {
     if (memberAddressed) {
       if (members.length > 0) {
         for (const m of members) {
+          const meta = recipientMeta.get(m.recipientId)
+          // « Ne pas déranger » : la personne a coupé toutes ses notifications.
+          if (meta?.dnd) continue
+          const pref = eventPrefByRecipient.get(m.recipientId)
+          // Désactivé pour cet événement par le membre.
+          if (pref && pref.isEnabled === false) continue
+          // Compte de réception choisi : préférence d'événement, sinon compte par défaut.
+          const chosenChannelId = pref?.channelId ?? meta?.defaultChannelId ?? null
+
           // Reroute (remplacement) : le membre a ses propres canaux → on y livre
-          // AU LIEU de l'identité fournie par l'event.
+          // AU LIEU de l'identité fournie par l'event. Si un compte précis est
+          // choisi (préférence/défaut), on ne livre QUE sur celui-ci.
           const personal = personalByRecipient.get(m.recipientId)
           if (personal && personal.length > 0) {
-            for (const pc of personal) {
+            let targets = personal
+            if (chosenChannelId) {
+              const picked = personal.find((p) => p.id === chosenChannelId)
+              if (picked) targets = [picked]
+            }
+            for (const pc of targets) {
               const pcConfig = (pc.config || {}) as Record<string, unknown>
               jobs.push({
                 route: { ...route, channel_id: pc.id, channel_type: pc.type, channel_config: pcConfig },
@@ -267,6 +309,16 @@ export async function POST(request: NextRequest) {
     if (route.channel_type === 'email') destination = (job.dispatchConfig.email as string) || null
     else if (route.channel_type === 'discord_dm') destination = (job.dispatchConfig.discord_user_id as string) || null
 
+    // Contenu rendu (pour l'aperçu « message exact reçu » dans l'historique).
+    const renderedContent = route.step
+      ? {
+          subject: route.step.subject ? renderTemplate(route.step.subject, body.payload) : null,
+          body: route.step.body ? renderTemplate(route.step.body, body.payload) : '',
+          format: route.step.format || 'text',
+          channel_type: route.channel_type,
+        }
+      : null
+
     // Créer l'exécution (status pending)
     const { data: execution, error: execError } = await supabase
       .schema('notifications')
@@ -281,6 +333,7 @@ export async function POST(request: NextRequest) {
         status: 'pending',
         payload: body.payload,
         destination,
+        rendered_content: renderedContent,
       })
       .select('id')
       .single()

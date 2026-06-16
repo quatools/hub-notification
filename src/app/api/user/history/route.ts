@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   let query = supabase
     .schema('notifications')
     .from('workflow_executions')
-    .select('id, event_slug, status, sent_at, created_at, destination, channels:channel_id ( type, label )')
+    .select('id, event_slug, status, sent_at, created_at, destination, error_message, rendered_content, channels:channel_id ( type, label )')
     .eq('recipient_id', (recipient as { id: string }).id)
     .order('created_at', { ascending: false })
     .limit(100)
@@ -62,6 +62,8 @@ export async function GET(request: NextRequest) {
     channel_type: e.channels?.type || null,
     channel_label: e.channels?.label || null,
     destination: (e.destination as string | null) || null,
+    error_message: (e.error_message as string | null) || null,
+    rendered_content: (e.rendered_content as Record<string, unknown> | null) || null,
     status: e.status as 'pending' | 'sent' | 'failed',
     sent_at: e.sent_at as string | null,
     created_at: e.created_at as string,
