@@ -90,6 +90,38 @@ export async function POST(request: NextRequest) {
     for (const s of settled) if (s.status === 'fulfilled') members.push(s.value)
   }
 
+  // 4c. Canaux perso de réception (REROUTE = remplacement) : si un membre rattaché
+  // a ajouté ses propres canaux, ses notifs « au membre concerné » partent dessus
+  // AU LIEU de l'identité fournie par l'event. Seuls les membres liés (auth_user_id)
+  // en ont. (Décision produit : remplacer, pas dédoubler.)
+  const personalByRecipient = new Map<
+    string,
+    { id: string; type: string; config: Record<string, unknown> }[]
+  >()
+  for (const m of members) {
+    const { data: rec } = await supabase
+      .schema('notifications')
+      .from('recipients')
+      .select('auth_user_id')
+      .eq('id', m.recipientId)
+      .maybeSingle()
+    const authId = (rec as { auth_user_id?: string | null } | null)?.auth_user_id
+    if (!authId) continue
+    const { data: chans } = await supabase
+      .schema('notifications')
+      .from('channels')
+      .select('id, type, config')
+      .eq('user_id', authId)
+      .is('org_id', null)
+      .eq('is_active', true)
+    if (chans && chans.length > 0) {
+      personalByRecipient.set(
+        m.recipientId,
+        chans as { id: string; type: string; config: Record<string, unknown> }[]
+      )
+    }
+  }
+
   // 5. Résoudre les routes via les workflows
   const routes = await resolveRoutes(notifEvent, body.org_id, body.target_users)
 
@@ -126,8 +158,27 @@ export async function POST(request: NextRequest) {
 
     if (memberAddressed) {
       if (members.length > 0) {
-        // Un envoi par destinataire fourni par l'event, sur SON identité.
         for (const m of members) {
+          // Reroute (remplacement) : le membre a ses propres canaux → on y livre
+          // AU LIEU de l'identité fournie par l'event.
+          const personal = personalByRecipient.get(m.recipientId)
+          if (personal && personal.length > 0) {
+            for (const pc of personal) {
+              const pcConfig = (pc.config || {}) as Record<string, unknown>
+              jobs.push({
+                route: { ...route, channel_id: pc.id, channel_type: pc.type, channel_config: pcConfig },
+                recipientId: m.recipientId,
+                userId: m.appUserId || m.recipientId,
+                dispatchConfig: pcConfig,
+                isMember: true,
+                skipReason:
+                  pc.type === 'email' && !pcConfig.email ? 'Canal perso email sans adresse' : undefined,
+              })
+            }
+            continue
+          }
+
+          // Défaut : livraison sur l'identité fournie par l'event.
           let dispatchConfig: Record<string, unknown> = config
           let skipReason: string | undefined
           if (route.channel_type === 'discord_dm') {
