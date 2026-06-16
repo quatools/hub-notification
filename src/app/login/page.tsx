@@ -90,7 +90,7 @@ function LoginContent() {
             <div className="mx-auto w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center">
               <Bell className="h-7 w-7 text-primary" />
             </div>
-            <CardTitle className="text-2xl">Vos notifications, votre vie, vos choix.</CardTitle>
+            <CardTitle className="font-serif text-2xl font-medium">Vos notifications, votre vie, vos choix.</CardTitle>
             <CardDescription className="text-base">
               {name ? `Bonjour ${name}, votre` : "Votre"} partenaire s&apos;associe à{" "}
               <strong>Quatools Hub</strong> pour vous offrir une transparence totale et la maîtrise de vos
@@ -133,7 +133,7 @@ function LoginContent() {
           <div className="mx-auto w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center">
             <Bell className="h-7 w-7 text-primary" />
           </div>
-          <CardTitle className="text-2xl">Quatools Notifications</CardTitle>
+          <CardTitle className="font-serif text-2xl font-medium">Quatools Notifications</CardTitle>
           <CardDescription>
             Connectez-vous pour gérer les notifications de votre organisation.
           </CardDescription>
