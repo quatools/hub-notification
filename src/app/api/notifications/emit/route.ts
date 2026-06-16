@@ -4,7 +4,9 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { resolveRoutes, type RouteResult } from '@/lib/notifications/routing'
 import { getSenderIdentity } from '@/lib/notifications/sender'
 import { resolveRecipient } from '@/lib/notifications/recipients'
+import { mintUnsubToken } from '@/lib/notifications/unsubscribe-token'
 import { getDispatcher } from '@/lib/dispatchers'
+import { baseUrl } from '@/lib/oauth/base-url'
 import type { EmitRequest, EmitResponse, NotificationEvent } from '@/lib/types/notifications'
 
 export async function POST(request: NextRequest) {
@@ -243,6 +245,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Envoi effectif (en arrière-plan, NON attendu).
+  const base = baseUrl(request)
   const runDispatch = async ({ executionId, job }: { executionId: string; job: DeliveryJob }) => {
     const { route } = job
     const execs = () => supabase.schema('notifications').from('workflow_executions')
@@ -259,12 +262,20 @@ export async function POST(request: NextRequest) {
           .eq('id', executionId)
         return
       }
+      // Lien de désabonnement 1-clic pour les canaux email (List-Unsubscribe).
+      let unsubUrl: string | undefined
+      if (route.channel_type === 'email' && job.recipientId) {
+        const token = mintUnsubToken({ r: job.recipientId, w: route.workflow_id })
+        unsubUrl = `${base}/api/unsubscribe?token=${encodeURIComponent(token)}`
+      }
+
       const result = await dispatcher({
         config: job.dispatchConfig,
         event: notifEvent,
         payload: body.payload,
         step: route.step,
         sender,
+        unsubUrl,
       })
       await execs()
         .update({

@@ -20,6 +20,8 @@ export interface DispatchParams {
   }
   /** Identité d'expéditeur de l'organisation (marque blanche) */
   sender?: SenderIdentity
+  /** URL de désabonnement 1-clic (List-Unsubscribe), pour les canaux email. */
+  unsubUrl?: string
 }
 
 type DispatchFn = (params: DispatchParams) => Promise<DispatchResult>

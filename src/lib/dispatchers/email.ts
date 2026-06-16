@@ -62,7 +62,7 @@ function buildFrom(sender?: DispatchParams['sender']): string {
 }
 
 export async function dispatchEmail(params: DispatchParams): Promise<DispatchResult> {
-  const { config, event, payload, step, sender } = params
+  const { config, event, payload, step, sender, unsubUrl } = params
 
   const email = config.email as string
   if (!email) {
@@ -94,13 +94,27 @@ export async function dispatchEmail(params: DispatchParams): Promise<DispatchRes
         category: event.category,
       })
 
+  // Désabonnement 1-clic : lien visible + en-têtes List-Unsubscribe (RFC 8058),
+  // requis par Gmail/Yahoo pour la délivrabilité.
+  let finalHtml = html
+  if (unsubUrl) {
+    const footer = `<div style="text-align:center;margin-top:20px;font-size:12px;color:#9ca3af;font-family:system-ui,sans-serif"><a href="${unsubUrl}" style="color:#9ca3af">Se désabonner de cette notification</a></div>`
+    finalHtml = html.includes('</body>') ? html.replace('</body>', `${footer}</body>`) : html + footer
+  }
+
   try {
     await smtp.sendMail({
       from: buildFrom(sender),
       to: email,
       subject,
-      html,
+      html: finalHtml,
       ...(sender?.replyTo && { replyTo: sender.replyTo }),
+      ...(unsubUrl && {
+        headers: {
+          'List-Unsubscribe': `<${unsubUrl}>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        },
+      }),
     })
 
     return { success: true }
