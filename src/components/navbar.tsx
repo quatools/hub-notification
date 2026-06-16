@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useClub } from "@/lib/contexts/club-context"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { AccountMenu } from "@/components/account-menu"
 import { Bell, LayoutDashboard, Zap, Radio, Workflow, ScrollText, BellOff, Mail, Settings, Building2 } from "lucide-react"
 
 export function Navbar() {
@@ -65,7 +66,8 @@ export function Navbar() {
           </span>
         )}
 
-        <nav className="flex items-center gap-1 ml-auto">
+        <div className="ml-auto flex items-center gap-3">
+        <nav className="flex items-center gap-1">
           {navItems.map((item) => {
             const isActive = 'exact' in item && item.exact
               ? pathname === item.href
@@ -87,6 +89,8 @@ export function Navbar() {
             )
           })}
         </nav>
+          <AccountMenu />
+        </div>
       </div>
     </header>
   )
