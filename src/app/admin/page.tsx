@@ -9,7 +9,8 @@ import { useClub } from "@/lib/contexts/club-context"
 import { FlowDiagram } from "@/components/flow-diagram"
 import { toast } from "sonner"
 import Link from "next/link"
-import { Radio, Workflow, ScrollText, AlertCircle, CheckCircle, CheckCircle2, XCircle, LogIn, ArrowRight } from "lucide-react"
+import { DiscordLoginButton } from "@/components/discord-login-button"
+import { Radio, Workflow, ScrollText, AlertCircle, CheckCircle, CheckCircle2, XCircle, ArrowRight, Bell, Mail, Palette, Sparkles, Users, ShieldCheck } from "lucide-react"
 
 interface DashboardData {
   events_count: number
@@ -81,15 +82,47 @@ export default function AdminDashboardPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="text-center py-12">
-        <LogIn className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Connexion requise</h2>
-        <p className="text-muted-foreground mb-4">
-          Connectez-vous pour accéder à l&apos;espace d&apos;administration.
-        </p>
-        <Button asChild>
-          <Link href="/login">Se connecter</Link>
-        </Button>
+      <div className="flex items-center justify-center py-8 px-4">
+        <Card className="w-full max-w-lg">
+          <CardHeader className="text-center space-y-3">
+            <div className="mx-auto w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Bell className="h-7 w-7 text-primary" />
+            </div>
+            <CardTitle className="text-2xl leading-snug">
+              Centralisez vos notifications.<br />Donnez le contrôle à vos membres.
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Le service de notifications partenaire de votre plateforme — à vos couleurs.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <ul className="space-y-3 text-sm">
+              <li className="flex items-start gap-3">
+                <Mail className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                <span><strong>Email + Discord</strong> (et les canaux suivants), une seule intégration — sans retoucher vos apps.</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <Palette className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                <span><strong>En marque blanche</strong>, à vos couleurs.</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <Sparkles className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                <span><strong>Configurable par l&apos;IA</strong> (connecteur Claude).</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <Users className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                <span>Des <strong>préférences que vos membres possèdent</strong> vraiment.</span>
+              </li>
+            </ul>
+
+            <DiscordLoginButton next="/admin" className="w-full" />
+
+            <p className="flex items-start justify-center gap-1.5 text-xs text-muted-foreground text-center">
+              <ShieldCheck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <span>Connexion via votre compte partenaire. Vos clubs apparaissent automatiquement, rien à recréer.</span>
+            </p>
+          </CardContent>
+        </Card>
       </div>
     )
   }
