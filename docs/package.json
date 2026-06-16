@@ -1,0 +1,14 @@
+{
+  "name": "hub-notification-docs",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Documentation publique du Hub Notification (VitePress).",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.3"
+  }
+}

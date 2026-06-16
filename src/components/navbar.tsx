@@ -24,8 +24,8 @@ export function Navbar() {
 
   const userItems = [
     { href: "/preferences", label: "Mes notifications", exact: true },
-    { href: "/preferences/channels", label: "Mes canaux de réception", exact: false },
-    { href: "/preferences/history", label: "Historique", exact: false },
+    { href: "/preferences/channels", label: "Mes comptes", exact: false },
+    { href: "/preferences/history", label: "Mon historique", exact: false },
   ]
 
   const navItems = isAdmin ? adminItems : isUser ? userItems : []
@@ -49,8 +49,16 @@ export function Navbar() {
               <SelectValue placeholder="Organisation" />
             </SelectTrigger>
             <SelectContent>
+              <div className="mono-label px-2 py-1.5">Organisations que vous administrez</div>
               {clubs.map((club) => (
-                <SelectItem key={club.club_id} value={club.club_id}>{club.club_name}</SelectItem>
+                <SelectItem key={club.club_id} value={club.club_id}>
+                  <span className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded bg-primary text-[10px] font-semibold text-primary-foreground">
+                      {club.club_name?.charAt(0).toUpperCase() || "•"}
+                    </span>
+                    {club.club_name}
+                  </span>
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
