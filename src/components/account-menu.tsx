@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { LogOut, Shield, User, Check } from "lucide-react"
+import { LogOut, Shield, User, Check, Zap, Settings } from "lucide-react"
 
 /** Avatar + menu compte : bascule d'espace (admin / membre) et déconnexion. */
 export function AccountMenu() {
@@ -105,6 +105,18 @@ export function AccountMenu() {
               {isUser && <Check className="h-4 w-4 text-[color:var(--qt-copper-500)]" />}
             </Link>
           </div>
+
+          {isAdmin && (
+            <div className="mt-1.5 border-t pt-1.5">
+              <div className="mono-label px-2.5 py-1.5">Administration</div>
+              <Link href="/admin/events" onClick={() => setOpen(false)} className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] hover:bg-secondary">
+                <Zap className="h-4 w-4 text-muted-foreground" />Événements
+              </Link>
+              <Link href="/admin/settings" onClick={() => setOpen(false)} className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] hover:bg-secondary">
+                <Settings className="h-4 w-4 text-muted-foreground" />Paramètres
+              </Link>
+            </div>
+          )}
 
           <div className="mt-1.5 border-t pt-1.5">
             <button
