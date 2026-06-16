@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils"
 import { useClub } from "@/lib/contexts/club-context"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { AccountMenu } from "@/components/account-menu"
-import { Bell } from "lucide-react"
 
 export function Navbar() {
   const pathname = usePathname()
@@ -35,9 +34,8 @@ export function Navbar() {
     <header className="border-b bg-card">
       <div className="flex items-center h-[58px] gap-3 px-5">
         <Link href="/" className="flex items-center gap-2.5 shrink-0">
-          <span className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] bg-primary text-primary-foreground">
-            <Bell className="h-3.5 w-3.5" />
-          </span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/notifications-favicon.svg" alt="" width={26} height={26} className="h-[26px] w-[26px] rounded-[7px]" />
           <span className="font-semibold text-[15px] tracking-tight">Notifications</span>
         </Link>
 

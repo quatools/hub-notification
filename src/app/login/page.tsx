@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Bell, Loader2, SlidersHorizontal, BellOff, Forward, ShieldCheck } from "lucide-react"
+import { Loader2, SlidersHorizontal, BellOff, Forward, ShieldCheck } from "lucide-react"
 
 /** Seules les destinations internes sont autorisées (anti open-redirect). */
 function safeNext(next: string | null): string {
@@ -88,7 +88,8 @@ function LoginContent() {
         <Card className="w-full max-w-lg">
           <CardHeader className="text-center space-y-3">
             <div className="mx-auto w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Bell className="h-7 w-7 text-primary" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/notifications-mark.svg" alt="" width={32} height={32} className="h-8 w-8" />
             </div>
             <CardTitle className="font-serif text-2xl font-medium">Vos notifications, votre vie, vos choix.</CardTitle>
             <CardDescription className="text-base">
@@ -131,7 +132,8 @@ function LoginContent() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-3">
           <div className="mx-auto w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Bell className="h-7 w-7 text-primary" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/notifications-mark.svg" alt="" width={32} height={32} className="h-8 w-8" />
           </div>
           <CardTitle className="font-serif text-2xl font-medium">Quatools Notifications</CardTitle>
           <CardDescription>
