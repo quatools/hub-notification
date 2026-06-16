@@ -7,8 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
+  --font-serif: var(--font-fraunces);
+  --font-mono: var(--font-plex-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -38,6 +39,10 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  /* Couleurs de marque Quatools exposées en utilitaires Tailwind */
+  --color-copper: var(--qt-copper-500);
+  --color-ink: var(--qt-ink-700);
+  --color-success: var(--qt-success);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -48,72 +53,61 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
+  /* ===== Charte Quatools v1 (source de vérité) ===== */
+  --qt-bg:         #FAF8F3;
+  --qt-surface:    #FFFFFF;
+  --qt-text:       #1E2B38;
+  --qt-text-muted: #5C5648;
+  --qt-line:       #DAD4C6;
+  --qt-ink-900: #16283B;
+  --qt-ink-700: #24405E;
+  --qt-ink-500: #3E6285;
+  --qt-ink-300: #9DB4C9;
+  --qt-ink-100: #E3EBF2;
+  --qt-on-ink:  #F4F0E8;
+  --qt-copper-900: #6E2F17;
+  --qt-copper-700: #8F3E1F;
+  --qt-copper-500: #C05B2E;
+  --qt-copper-300: #E2A07C;
+  --qt-copper-100: #F7E5DA;
+  --qt-on-copper:  #FBEADF;
+  --qt-success: #2F7D5B;
+  --qt-danger:  #B5402F;
+  --qt-bar-gradient: linear-gradient(90deg, var(--qt-ink-700), var(--qt-copper-500));
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  /* ===== Mapping shadcn → Quatools ===== */
+  --radius: 0.75rem;                 /* cartes ~12px */
+  --background: var(--qt-bg);
+  --foreground: var(--qt-text);
+  --card: var(--qt-surface);
+  --card-foreground: var(--qt-text);
+  --popover: var(--qt-surface);
+  --popover-foreground: var(--qt-text);
+  --primary: var(--qt-ink-700);      /* bouton primaire = encre (jamais cuivre) */
+  --primary-foreground: var(--qt-on-ink);
+  --secondary: #F1EEE7;              /* neutre chaud clair */
+  --secondary-foreground: var(--qt-ink-700);
+  --muted: #F1EEE7;
+  --muted-foreground: var(--qt-text-muted);
+  --accent: #EFE8DC;                 /* survol/sélection subtil (PAS le cuivre de marque) */
+  --accent-foreground: var(--qt-ink-700);
+  --destructive: var(--qt-danger);
+  --border: var(--qt-line);
+  --input: var(--qt-line);
+  --ring: var(--qt-copper-500);      /* focus = cuivre */
+  --chart-1: var(--qt-copper-500);
+  --chart-2: var(--qt-ink-700);
+  --chart-3: var(--qt-success);
+  --chart-4: var(--qt-ink-500);
+  --chart-5: var(--qt-copper-300);
+  --sidebar: var(--qt-surface);
+  --sidebar-foreground: var(--qt-text);
+  --sidebar-primary: var(--qt-ink-700);
+  --sidebar-primary-foreground: var(--qt-on-ink);
+  --sidebar-accent: #EFE8DC;
+  --sidebar-accent-foreground: var(--qt-ink-700);
+  --sidebar-border: var(--qt-line);
+  --sidebar-ring: var(--qt-copper-500);
 }
 
 @layer base {
@@ -122,5 +116,50 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+  }
+  /* Titres Fraunces — JAMAIS italique ; accent d'un mot = <em> redressé + cuivre 600 */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-serif);
+    font-style: normal;
+    letter-spacing: -0.01em;
+  }
+  h1 em, h2 em, h3 em, h4 em, h5 em, h6 em {
+    font-style: normal;
+    font-weight: 600;
+    color: var(--qt-copper-500);
+  }
+  ::selection {
+    background: var(--qt-copper-500);
+    color: var(--qt-on-copper);
+  }
+}
+
+@layer components {
+  /* Eyebrow / légende technique — Plex Mono capitales espacées (signature) */
+  .mono-label {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    line-height: 1.4;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--qt-text-muted);
+  }
+  /* Numérotation éditoriale / données — mono cuivre */
+  .serif-num {
+    font-family: var(--font-mono);
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    color: var(--qt-copper-500);
+  }
+  /* Barre traversante — séparateur de marque (dégradé encre→cuivre) */
+  .qt-bar {
+    display: block;
+    width: 64px;
+    height: 3px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--qt-bar-gradient);
   }
 }
