@@ -1,8 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,7 +10,6 @@ import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
-import { PageHeader } from "@/components/page-header"
 import { useClub } from "@/lib/contexts/club-context"
 import { toast } from "sonner"
 import { Plus, Radio, Mail, MessageCircle, Trash2, Pencil, CheckCircle, XCircle, Loader2 } from "lucide-react"
@@ -189,14 +187,13 @@ export default function AdminChannelsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Canaux"
-        description="Un canal est une destination de notification : un salon Discord (via webhook) ou une adresse email. Vous les brancherez ensuite sur des événements via les workflows."
-        flowStep="channel"
-        actions={
-          <Button onClick={openCreate}><Plus className="h-4 w-4 mr-2" />Ajouter un canal</Button>
-        }
-      />
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="font-serif text-2xl font-medium">Canaux</h1>
+          <p className="text-sm text-muted-foreground mt-1">Les destinations où vos notifications sont envoyées.</p>
+        </div>
+        <Button onClick={openCreate}><Plus className="h-4 w-4 mr-2" />Ajouter un canal</Button>
+      </div>
 
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm() }}>
         <DialogContent>
@@ -304,44 +301,41 @@ export default function AdminChannelsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {channels.map((channel) => (
-            <Card key={channel.id}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {getChannelIcon(channel.type)}
-                    <div>
-                      <CardTitle className="text-base">{channel.label || getChannelTypeLabel(channel.type)}</CardTitle>
-                      <p className="text-sm text-muted-foreground mt-0.5">{getChannelTypeLabel(channel.type)} &middot; {getChannelDetail(channel)}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Badge variant={channel.is_verified ? "default" : "secondary"} className="text-xs">
-                      {channel.is_verified ? <><CheckCircle className="h-3 w-3 mr-1" />Vérifié</> : <><XCircle className="h-3 w-3 mr-1" />Non vérifié</>}
-                    </Badge>
-                    <Switch checked={channel.is_active} onCheckedChange={() => handleToggle(channel)} />
-                    <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => openEdit(channel)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Supprimer ce canal ?</AlertDialogTitle>
-                          <AlertDialogDescription>Les workflows utilisant ce canal seront également supprimés. Cette action est irréversible.</AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Annuler</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDelete(channel.id)}>Supprimer</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
+            <Card key={channel.id} className="p-4">
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-secondary">
+                  {getChannelIcon(channel.type)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold">{channel.label || getChannelTypeLabel(channel.type)}</div>
+                  <div className="truncate text-xs text-muted-foreground">{getChannelTypeLabel(channel.type)} &middot; {getChannelDetail(channel)}</div>
                 </div>
-              </CardHeader>
+                <span className={`mono-label flex shrink-0 items-center gap-1 ${channel.is_verified ? "text-[color:var(--qt-success)]" : "text-muted-foreground"}`}>
+                  {channel.is_verified ? <CheckCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                  {channel.is_verified ? "Vérifié" : "Non vérifié"}
+                </span>
+                <Switch checked={channel.is_active} onCheckedChange={() => handleToggle(channel)} />
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => openEdit(channel)}>
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Supprimer ce canal ?</AlertDialogTitle>
+                      <AlertDialogDescription>Les workflows utilisant ce canal seront également supprimés. Cette action est irréversible.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Annuler</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleDelete(channel.id)}>Supprimer</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
             </Card>
           ))}
         </div>
