@@ -27,6 +27,10 @@ interface DashboardData {
 export default function AdminDashboardPage() {
   const { selectedClub, loading: clubLoading, isAuthenticated, clubs } = useClub()
   const orgId = selectedClub?.club_id
+  // Club d'origine passé par l'app partenaire (?org=) — préservé à la connexion.
+  const orgParam = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("org")
+    : null
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -115,7 +119,7 @@ export default function AdminDashboardPage() {
               </li>
             </ul>
 
-            <DiscordLoginButton next="/admin" className="w-full" />
+            <DiscordLoginButton next={orgParam ? `/admin?org=${orgParam}` : "/admin"} className="w-full" />
 
             <p className="flex items-start justify-center gap-1.5 text-xs text-muted-foreground text-center">
               <ShieldCheck className="h-3.5 w-3.5 mt-0.5 shrink-0" />

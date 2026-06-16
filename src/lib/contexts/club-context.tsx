@@ -45,11 +45,19 @@ export function ClubProvider({ children }: { children: ReactNode }) {
       const clubList: Club[] = data.clubs || []
       setClubs(clubList)
 
-      // Auto-select: restore from localStorage or pick the only one
+      // Sélection : priorité au club passé dans l'URL (?org=, depuis le deep-link
+      // d'une app partenaire) — sinon restaure le dernier choisi, sinon l'unique.
+      const urlOrg = typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("org")
+        : null
+      const fromUrl = urlOrg ? clubList.find((c) => c.club_id === urlOrg) : null
       const savedId = localStorage.getItem("selected_club_id")
       const saved = savedId ? clubList.find((c) => c.club_id === savedId) : null
 
-      if (saved) {
+      if (fromUrl) {
+        setSelectedClub(fromUrl)
+        localStorage.setItem("selected_club_id", fromUrl.club_id)
+      } else if (saved) {
         setSelectedClub(saved)
       } else if (clubList.length === 1) {
         setSelectedClub(clubList[0])
