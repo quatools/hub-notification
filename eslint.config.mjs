@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Références externes, non maintenues par nous (handoff design + doc VitePress).
+    "Amélioration UX Hub Notification-handoff/**",
+    "docs/**",
   ]),
 ]);
 

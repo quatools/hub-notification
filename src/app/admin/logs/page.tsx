@@ -55,13 +55,6 @@ function statusColor(status: string) {
   return "#9197A1"
 }
 
-function statusLabel(status: string) {
-  if (status === "sent") return "Envoyé"
-  if (status === "failed") return "Échec"
-  if (status === "pending") return "En attente"
-  return status
-}
-
 function StatusPill({ status }: { status: string }) {
   const base = "rounded-full px-2 py-0.5 text-[10px] font-mono"
   if (status === "sent") {
@@ -242,7 +235,7 @@ function LogsContent() {
           <div className="absolute top-0 right-0 bottom-0 flex w-[460px] max-w-[90vw] flex-col bg-card shadow-2xl">
             {/* Header */}
             <div className="flex items-center justify-between border-b px-5 py-4">
-              <h3 className="font-serif text-lg font-medium">Détail de l'envoi</h3>
+              <h3 className="font-serif text-lg font-medium">Détail de l&apos;envoi</h3>
               <button
                 onClick={() => setDetailLog(null)}
                 className="rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"

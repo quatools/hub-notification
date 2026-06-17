@@ -1,8 +1,7 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
-import type { SupabaseClient } from "@supabase/supabase-js"
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
 
@@ -15,15 +14,11 @@ export function DiscordLoginButton({
   className?: string
 }) {
   const [isLoading, setIsLoading] = useState(false)
-  const supabaseRef = useRef<SupabaseClient | null>(null)
-  if (!supabaseRef.current && typeof window !== "undefined") {
-    supabaseRef.current = createClient()
-  }
 
   const handleLogin = async () => {
-    if (!supabaseRef.current) return
+    const supabase = createClient()
     setIsLoading(true)
-    const { error } = await supabaseRef.current.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: "discord",
       options: {
         redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,

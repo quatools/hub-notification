@@ -4,32 +4,27 @@ import { useEffect, useState, useRef } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
-import type { SupabaseClient } from "@supabase/supabase-js"
 import { LogOut, Shield, User, Check, Zap, Settings } from "lucide-react"
 
 /** Avatar + menu compte : bascule d'espace (admin / membre) et déconnexion. */
 export function AccountMenu() {
   const router = useRouter()
   const pathname = usePathname()
-  const supabaseRef = useRef<SupabaseClient | null>(null)
+  const supabase = createClient()
   const wrapRef = useRef<HTMLDivElement>(null)
   const [name, setName] = useState<string | null>(null)
   const [email, setEmail] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
 
-  if (!supabaseRef.current && typeof window !== "undefined") {
-    supabaseRef.current = createClient()
-  }
-
   useEffect(() => {
-    supabaseRef.current?.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(({ data }) => {
       const u = data.user
       if (!u) return
       const m = (u.user_metadata || {}) as Record<string, string>
       setName(m.full_name || m.name || u.email || null)
       setEmail(u.email || null)
     })
-  }, [])
+  }, [supabase])
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -48,7 +43,7 @@ export function AccountMenu() {
   const isUser = pathname.startsWith("/preferences")
 
   const logout = async () => {
-    await supabaseRef.current?.auth.signOut()
+    await supabase.auth.signOut()
     router.push("/login")
     router.refresh()
   }

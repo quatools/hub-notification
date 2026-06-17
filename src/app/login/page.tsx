@@ -1,11 +1,10 @@
 "use client"
 
-import { useEffect, useState, useRef, Suspense, useMemo } from "react"
+import { useEffect, useState, Suspense, useMemo } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { safeInternalPath } from "@/lib/safe-next"
-import type { SupabaseClient } from "@supabase/supabase-js"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2, SlidersHorizontal, BellOff, Forward, ShieldCheck } from "lucide-react"
@@ -67,22 +66,17 @@ function LoginContent() {
   const next = safeNext(searchParams.get("next"))
   const { isMemberLink, name } = useMemo(() => decodeLinkInfo(next), [next])
   const [isLoading, setIsLoading] = useState(false)
-  const supabaseRef = useRef<SupabaseClient | null>(null)
-
-  if (!supabaseRef.current && typeof window !== "undefined") {
-    supabaseRef.current = createClient()
-  }
+  const supabase = createClient()
 
   useEffect(() => {
-    supabaseRef.current?.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) router.push(next)
     })
-  }, [router, next])
+  }, [router, next, supabase])
 
   const handleDiscordLogin = async () => {
-    if (!supabaseRef.current) return
     setIsLoading(true)
-    const { error } = await supabaseRef.current.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: "discord",
       options: {
         redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
