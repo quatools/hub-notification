@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, Suspense, useMemo } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { Button } from "@/components/ui/button"
@@ -45,6 +46,17 @@ function DiscordButton({ onClick, isLoading }: { onClick: () => void; isLoading:
       )}
       Se connecter avec Discord
     </Button>
+  )
+}
+
+/** Mention de consentement affichée sous le bouton de connexion. */
+function LegalConsent() {
+  return (
+    <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
+      En continuant, vous acceptez les{" "}
+      <Link href="/cgu" className="underline hover:text-foreground">CGU</Link>{" "}et la{" "}
+      <Link href="/confidentialite" className="underline hover:text-foreground">Politique de confidentialité</Link>.
+    </p>
   )
 }
 
@@ -120,6 +132,7 @@ function LoginContent() {
               <ShieldCheck className="h-3.5 w-3.5" />
               Vous restez maître et propriétaire de vos notifications.
             </p>
+            <LegalConsent />
           </CardContent>
         </Card>
       </div>
@@ -140,8 +153,9 @@ function LoginContent() {
             Connectez-vous pour gérer les notifications de votre organisation.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <DiscordButton onClick={handleDiscordLogin} isLoading={isLoading} />
+          <LegalConsent />
         </CardContent>
       </Card>
     </div>

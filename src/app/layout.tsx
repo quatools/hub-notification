@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Fraunces, Inter, IBM_Plex_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { Navbar } from "@/components/navbar";
+import { Footer } from "@/components/footer";
 import { ClubProvider } from "@/lib/contexts/club-context";
 import "./globals.css";
 
@@ -48,6 +49,7 @@ export default function RootLayout({
           <main className="container mx-auto px-4 py-8 max-w-5xl">
             {children}
           </main>
+          <Footer />
         </ClubProvider>
         <Toaster />
       </body>
