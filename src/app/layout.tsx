@@ -30,8 +30,18 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Quatools Notifications",
-  description: "Gérez vos notifications Quatools",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://hub.quatools.fr"),
+  title: {
+    default: "Quatools Notifications",
+    template: "%s · Quatools Notifications",
+  },
+  description:
+    "Le hub de notifications de votre organisation : configurez vos canaux et vos messages, et laissez chaque membre maîtriser ce qu'il reçoit et où.",
+  // Hors prod, on empêche toute indexation au niveau métadonnées (en plus du robots.txt).
+  robots:
+    process.env.NEXT_PUBLIC_ALLOW_INDEXING === "true"
+      ? undefined
+      : { index: false, follow: false },
 };
 
 export default function RootLayout({

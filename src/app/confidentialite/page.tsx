@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 
 export const metadata: Metadata = {
-  title: "Politique de confidentialité — Quatools Notifications",
+  title: "Politique de confidentialité",
   description:
     "Comment Quatools Hub Notification traite les données personnelles : rôles, données collectées, bases légales, durées, sous-traitants et droits des personnes.",
 }

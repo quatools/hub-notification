@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 
 export const metadata: Metadata = {
-  title: "Conditions générales d'utilisation — Quatools Notifications",
+  title: "Conditions générales d'utilisation",
   description:
     "Conditions générales d'utilisation du service Quatools Hub Notification : objet, accès, obligations, sous-traitance RGPD, responsabilité et droit applicable.",
 }
