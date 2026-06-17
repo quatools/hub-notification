@@ -11,7 +11,7 @@ Le *Model Context Protocol* est un standard ouvert qui permet à un assistant IA
 d'appeler des outils. Le hub expose un serveur MCP **par organisation** :
 
 ```text
-https://notifications.quatools.fr/api/mcp/{orgId}
+https://hub.quatools.fr/api/mcp/{orgId}
 ```
 
 Le protocole est du **JSON-RPC 2.0** sur HTTP, sécurisé par **OAuth 2.1 + PKCE**.
@@ -30,7 +30,7 @@ de votre organisation et les étapes de connexion.
 ### Depuis Claude Code (dev)
 
 ```bash
-claude mcp add --transport http hub-notif https://notifications.quatools.fr/api/mcp/<orgId>
+claude mcp add --transport http hub-notif https://hub.quatools.fr/api/mcp/<orgId>
 ```
 
 ## Les 15 outils disponibles

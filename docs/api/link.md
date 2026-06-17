@@ -11,7 +11,7 @@ Concept détaillé : [Destinataires & identités](/concepts/recipients-identity)
 ```text
 1. Dans votre app, le membre clique « Gérer mes notifications ».
 2. L'app génère un jeton signé et redirige vers :
-      https://notifications.quatools.fr/api/link?token=<JETON>
+      https://hub.quatools.fr/api/link?token=<JETON>
 3. Le hub vérifie le jeton. Si pas de session hub → login (Discord OAuth),
    puis reprise du flux.
 4. claimAppIdentity() ancre la personne à auth.users et fusionne toute fiche

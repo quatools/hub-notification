@@ -14,7 +14,7 @@ Plus deux briques transverses : le **rattachement** (`/api/link`) et l'**OAuth
 ## URL de base
 
 ```text
-Production : https://notifications.quatools.fr
+Production : https://hub.quatools.fr
 ```
 
 ## Authentification serveur-à-serveur

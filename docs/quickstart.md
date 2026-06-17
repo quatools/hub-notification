@@ -7,7 +7,7 @@ pour qu'ils soient réellement envoyés.
 ::: info Prérequis
 - Une **clé API** fournie par le hub (entrée dans `NOTIFICATION_API_KEYS`).
 - L'**`org_id`** (UUID de l'organisation) au nom de laquelle vous émettez.
-- L'**URL de base** du hub (ex. `https://notifications.quatools.fr`).
+- L'**URL de base** du hub (ex. `https://hub.quatools.fr`).
 :::
 
 ## 1. Déclarer ses événements
@@ -124,7 +124,7 @@ l'historique ou les logs pour cela.
 ## 4. Helper TypeScript prêt à l'emploi
 
 ```typescript
-const HUB_URL = process.env.NOTIFICATION_HUB_URL ?? 'https://notifications.quatools.fr'
+const HUB_URL = process.env.NOTIFICATION_HUB_URL ?? 'https://hub.quatools.fr'
 const API_KEY = process.env.NOTIFICATION_API_KEY!
 
 interface RecipientDescriptor {

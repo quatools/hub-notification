@@ -29,6 +29,8 @@ export function wrapEmailLayout(
 ): string {
   const brandName = options.senderName || 'Quatools Notifications'
   const accent = CATEGORY_ACCENTS[options.category || ''] || '#52525b'
+  // URL du hub selon l'environnement (prod : hub.quatools.fr, dev : hub-dev…).
+  const prefsUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://hub.quatools.fr'}/preferences`
 
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -91,7 +93,7 @@ export function wrapEmailLayout(
                 Envoyé par <strong style="color:#5f5c57;">${brandName}</strong>
               </p>
               <p style="margin:0;font-size:11px;color:#a8a49e;">
-                <a href="https://notifications.quatools.fr/preferences" style="color:#8a8782;text-decoration:underline;">Gérer mes notifications</a>
+                <a href="${prefsUrl}" style="color:#8a8782;text-decoration:underline;">Gérer mes notifications</a>
                 &nbsp;·&nbsp; propulsé par Quatools
               </p>
             </td>
