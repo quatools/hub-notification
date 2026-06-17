@@ -24,7 +24,27 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Erreur lors du chargement des canaux' }, { status: 500 })
   }
 
-  return NextResponse.json({ channels: data })
+  // Sécurité (L3) : ne jamais renvoyer le secret webhook Discord en clair. On
+  // masque le token et on expose un drapeau « configuré » pour l'UI. L'édition
+  // utilise un placeholder ; le webhook_url n'est mis à jour que si l'admin en
+  // saisit un nouveau.
+  const channels = (data || []).map((c) => {
+    if (c.type === 'discord_webhook' && c.config && typeof c.config.webhook_url === 'string') {
+      const url = c.config.webhook_url as string
+      return {
+        ...c,
+        config: {
+          ...c.config,
+          webhook_url: undefined,
+          webhook_configured: true,
+          webhook_hint: `…${url.slice(-12)}`,
+        },
+      }
+    }
+    return c
+  })
+
+  return NextResponse.json({ channels })
 }
 
 // POST /api/admin/channels

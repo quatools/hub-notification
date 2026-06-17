@@ -53,15 +53,26 @@ export async function POST(request: NextRequest) {
   let newCount = 0
   let updatedCount = 0
 
+  // Sécurité (L1/M1) : l'app de référence est celle de la clé API, jamais le
+  // body. Une app ne peut pas écrire/écraser les events d'une autre app.
+  const app = auth.app!
+
   try {
     for (const event of body.events) {
       // Vérifier si l'event existe déjà
       const { data: existing } = await supabase
         .schema('notifications')
         .from('events')
-        .select('id')
+        .select('id, app')
         .eq('slug', event.slug)
         .single()
+
+      if (existing && existing.app && existing.app !== app) {
+        return NextResponse.json(
+          { error: `Le slug "${event.slug}" appartient à une autre application.` },
+          { status: 409 }
+        )
+      }
 
       if (existing) {
         // UPDATE
@@ -69,7 +80,7 @@ export async function POST(request: NextRequest) {
           .schema('notifications')
           .from('events')
           .update({
-            app: body.app,
+            app,
             label: event.label,
             description: event.description || null,
             category: event.category,
@@ -90,7 +101,7 @@ export async function POST(request: NextRequest) {
           .schema('notifications')
           .from('events')
           .insert({
-            app: body.app,
+            app,
             slug: event.slug,
             label: event.label,
             description: event.description || null,

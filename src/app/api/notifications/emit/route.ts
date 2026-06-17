@@ -35,6 +35,13 @@ export async function POST(request: NextRequest) {
   if (!body.payload || typeof body.payload !== 'object') {
     return NextResponse.json({ error: 'Champ "payload" requis (object)' }, { status: 400 })
   }
+  // Validation/bornes (L4) : éviter l'amplification et les entrées malformées.
+  if (body.recipients !== undefined && (!Array.isArray(body.recipients) || body.recipients.length > 500)) {
+    return NextResponse.json({ error: '"recipients" doit être un tableau (max 500)' }, { status: 400 })
+  }
+  if (body.target_users !== undefined && (!Array.isArray(body.target_users) || body.target_users.length > 500)) {
+    return NextResponse.json({ error: '"target_users" doit être un tableau (max 500)' }, { status: 400 })
+  }
 
   const supabase = createServiceClient()
 
@@ -56,6 +63,14 @@ export async function POST(request: NextRequest) {
   }
 
   const notifEvent = event as NotificationEvent
+
+  // Sécurité (M1) : une clé API ne peut émettre que les événements de SON app.
+  if (notifEvent.app && auth.app && notifEvent.app !== auth.app) {
+    return NextResponse.json(
+      { error: `Événement "${body.event}" hors du périmètre de cette clé.` },
+      { status: 403 }
+    )
+  }
 
   // 4b. Résoudre les destinataires fournis par l'event (CDC v2) en fiches
   // canoniques. C'est ce qui rend les notifications rattachables au compte hub

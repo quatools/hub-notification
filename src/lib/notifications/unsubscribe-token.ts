@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'crypto'
+import { getSigningSecret, getSigningSecretOrNull } from '@/lib/signing-secret'
 
 /**
  * Jeton de désabonnement 1-clic (List-Unsubscribe).
@@ -7,20 +8,20 @@ import { createHmac, timingSafeEqual } from 'crypto'
  * rester valide. Encode la personne (recipient) + le workflow concerné.
  */
 
-const SECRET = process.env.MCP_OAUTH_SECRET || process.env.UNSUBSCRIBE_SECRET || ''
-
 export interface UnsubPayload {
   r: string // recipient_id
   w: string // workflow_id
 }
 
 export function mintUnsubToken(payload: UnsubPayload): string {
+  const secret = getSigningSecret() // lève si secret absent/trop court
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url')
-  const sig = createHmac('sha256', SECRET).update(body).digest('base64url')
+  const sig = createHmac('sha256', secret).update(body).digest('base64url')
   return `${body}.${sig}`
 }
 
 export function verifyUnsubToken(token: string): UnsubPayload | null {
+  const SECRET = getSigningSecretOrNull()
   if (!SECRET) return null
   const [body, sig] = token.split('.')
   if (!body || !sig) return null

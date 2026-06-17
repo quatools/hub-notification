@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, Suspense, useMemo } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
+import { safeInternalPath } from "@/lib/safe-next"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,7 +12,7 @@ import { Loader2, SlidersHorizontal, BellOff, Forward, ShieldCheck } from "lucid
 
 /** Seules les destinations internes sont autorisées (anti open-redirect). */
 function safeNext(next: string | null): string {
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/admin"
+  return safeInternalPath(next)
 }
 
 /** Décode (sans vérifier) le jeton de rattachement pour personnaliser l'accueil. */

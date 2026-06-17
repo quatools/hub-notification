@@ -42,17 +42,22 @@ export async function PUT(
 
     if (channel?.type === 'discord_webhook') {
       const webhookUrl = body.config.webhook_url as string
-      if (!webhookUrl || (
+      if (!webhookUrl) {
+        // Aucune nouvelle URL fournie → on conserve l'existante (le secret n'est
+        // jamais renvoyé au client, donc l'édition ne le réécrit pas par défaut).
+        delete updates.config
+      } else if (
         !webhookUrl.startsWith('https://discord.com/api/webhooks/') &&
         !webhookUrl.startsWith('https://discordapp.com/api/webhooks/')
-      )) {
+      ) {
         return NextResponse.json({ error: 'URL webhook Discord invalide' }, { status: 400 })
-      }
-      try {
-        const res = await fetch(webhookUrl)
-        updates.is_verified = res.ok
-      } catch {
-        updates.is_verified = false
+      } else {
+        try {
+          const res = await fetch(webhookUrl)
+          updates.is_verified = res.ok
+        } catch {
+          updates.is_verified = false
+        }
       }
     }
 

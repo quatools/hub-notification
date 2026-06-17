@@ -188,8 +188,8 @@ export default function AdminChannelsPage() {
 
   const getChannelDetail = (channel: Channel) => {
     if (channel.type === "discord_webhook") {
-      const url = channel.config.webhook_url as string
-      return url ? `...${url.slice(-20)}` : ""
+      // Le secret n'est plus renvoyé en clair : on affiche l'indice masqué.
+      return (channel.config.webhook_hint as string) || "Webhook configuré"
     }
     if (channel.type === "discord_dm") {
       return channel.config.recipient === "member" ? "Membre concerné par l'événement" : `ID ${channel.config.discord_user_id || ""}`
@@ -205,7 +205,8 @@ export default function AdminChannelsPage() {
 
   const submitDisabled =
     saving ||
-    (formType === "discord_webhook" ? !formWebhookUrl
+    // En édition d'un webhook, l'URL peut rester vide (= conserver l'existante).
+    (formType === "discord_webhook" ? (!isEditing && !formWebhookUrl)
       : formType === "discord_dm" ? (formDmRecipient === "fixed" && !formDiscordUserId.trim())
       : !formEmail)
 
@@ -262,7 +263,7 @@ export default function AdminChannelsPage() {
                 </div>
                 <div className="space-y-1.5">
                   <label className="block text-[12.5px] font-semibold text-foreground/80">URL du webhook</label>
-                  <Input placeholder="https://discord.com/api/webhooks/…" value={formWebhookUrl} onChange={(e) => setFormWebhookUrl(e.target.value)} />
+                  <Input placeholder={isEditing ? "Laisser vide pour conserver l'URL actuelle" : "https://discord.com/api/webhooks/…"} value={formWebhookUrl} onChange={(e) => setFormWebhookUrl(e.target.value)} />
                   <p className="text-[11.5px] text-muted-foreground">Le webhook poste dans un salon. Paramètres du serveur › Intégrations › Webhooks.</p>
                 </div>
               </div>

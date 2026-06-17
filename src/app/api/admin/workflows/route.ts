@@ -136,6 +136,22 @@ export async function POST(request: NextRequest) {
 
   const supabase = createServiceClient()
 
+  // Sécurité (H4) : le canal doit appartenir à la même organisation, sinon un
+  // admin pourrait router un workflow vers le canal privé d'un autre club.
+  const { data: channel } = await supabase
+    .schema('notifications')
+    .from('channels')
+    .select('id')
+    .eq('id', body.channel_id)
+    .eq('org_id', auth.org_id)
+    .maybeSingle()
+  if (!channel) {
+    return NextResponse.json(
+      { error: "Canal introuvable pour cette organisation" },
+      { status: 404 }
+    )
+  }
+
   // Créer le workflow
   const { data: workflow, error: wfError } = await supabase
     .schema('notifications')
