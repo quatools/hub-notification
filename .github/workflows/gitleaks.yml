@@ -1,0 +1,28 @@
+name: gitleaks
+
+# Filet de sécurité : détecte toute fuite de secret à chaque push / PR.
+# Utilise la configuration .gitleaks.toml à la racine (faux positifs écartés).
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:   # lançable manuellement depuis l'onglet Actions
+
+jobs:
+  scan:
+    name: Scan des secrets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (historique complet)
+        uses: actions/checkout@v4
+        with:
+          # Profondeur 0 = tout l'historique, pour scanner aussi les anciens commits.
+          fetch-depth: 0
+
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE n'est requis QUE pour les dépôts d'organisation GitHub.
+          # Pour un compte personnel / dépôt public, le scan est gratuit sans licence.

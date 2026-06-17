@@ -1,0 +1,15 @@
+# Configuration gitleaks — Hub Notification
+# Étend les règles par défaut de gitleaks et écarte les faux positifs connus.
+# Utilisé en local (`gitleaks git .`) ET par le workflow GitHub Actions.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Faux positifs : snowflake Discord d'exemple (identifiant public, pas un secret)"
+# Le placeholder universel 123456789012345678 sert d'exemple dans la doc et les
+# commentaires de code. Un user/client ID Discord n'est de toute façon pas un
+# secret (c'est un identifiant public, pas un token).
+regexes = [
+  '''123456789012345678''',
+]

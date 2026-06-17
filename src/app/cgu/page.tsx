@@ -26,7 +26,9 @@ export default function CguPage() {
       <h1 className="mt-1 font-serif text-[30px] font-medium leading-tight">Conditions générales d&apos;utilisation</h1>
       <p className="mt-2 text-sm text-muted-foreground">
         Dernière mise à jour : {LAST_UPDATE}. Les présentes conditions régissent l&apos;utilisation du service
-        <strong> Quatools Hub Notification</strong> (le « Service »), édité par [RAISON_SOCIALE] (« Quatools »).
+        <strong> Quatools Hub Notification</strong> (le « Service »), édité par Alexandre QUAGLIERI, entrepreneur
+        individuel — SIREN 520&nbsp;181&nbsp;520, RCS Nîmes, siège 161 chemin de l&apos;Estanet, 30840 Meynes —
+        (« Quatools »).
       </p>
 
       <Section n="1" title="Objet">
@@ -90,7 +92,7 @@ export default function CguPage() {
         <p>
           Quatools s&apos;efforce d&apos;assurer la disponibilité du Service mais le fournit « en l&apos;état », sans
           garantie de disponibilité ininterrompue. Des interruptions pour maintenance ou cause externe peuvent survenir.
-          [À ADAPTER si un engagement de niveau de service (SLA) est prévu.]
+          Aucun engagement de niveau de service (SLA) n&apos;est consenti à ce stade.
         </p>
       </Section>
 
@@ -105,7 +107,7 @@ export default function CguPage() {
         <p>
           Quatools ne saurait être tenu responsable du contenu des notifications décidées et déclenchées par le Client, ni
           des conséquences d&apos;un usage non conforme du Service. La responsabilité de Quatools est limitée aux dommages
-          directs et prévisibles, dans les limites permises par la loi. [Plafond de responsabilité à préciser le cas échéant.]
+          directs et prévisibles, dans les limites permises par la loi.
         </p>
       </Section>
 
@@ -127,8 +129,8 @@ export default function CguPage() {
       <Section n="11" title="Droit applicable et litiges">
         <p>
           Les présentes sont régies par le <strong>droit français</strong>. À défaut de résolution amiable, les tribunaux
-          compétents sont ceux de [VILLE_TRIBUNAL]. Un Membre consommateur peut recourir gratuitement à un médiateur de la
-          consommation [À COMPLÉTER : nom et coordonnées du médiateur].
+          compétents sont ceux du ressort de <strong>Nîmes</strong>, sous réserve des règles d&apos;ordre public
+          applicables.
         </p>
         <p className="text-muted-foreground">
           Voir aussi notre <Link href="/confidentialite" className="underline">Politique de confidentialité</Link>.

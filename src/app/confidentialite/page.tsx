@@ -46,8 +46,9 @@ export default function ConfidentialitePage() {
           fonctionnement technique du Service lui-même, Quatools agit comme responsable de traitement.
         </p>
         <p className="rounded-lg border border-[color:var(--qt-sable-300,#DAD4C6)] bg-secondary/40 p-3 text-xs text-muted-foreground">
-          Éditeur du Service : [RAISON_SOCIALE], [FORME_JURIDIQUE], SIREN [SIREN], siège social [SIÈGE_SOCIAL].
-          Contact données personnelles : [EMAIL_CONTACT].
+          Éditeur du Service : Alexandre QUAGLIERI, entrepreneur individuel — SIREN 520&nbsp;181&nbsp;520,
+          SIRET 520&nbsp;181&nbsp;520&nbsp;00039, TVA FR36520181520, RCS Nîmes — siège social :
+          161 chemin de l&apos;Estanet, 30840 Meynes (France). Contact données personnelles : alexandre@quatools.fr.
         </p>
       </Section>
 
@@ -76,7 +77,7 @@ export default function ConfidentialitePage() {
         <p>Pour fournir le Service, Quatools recourt à des prestataires techniques (sous-traitants ultérieurs), chacun limité à ce qui est nécessaire :</p>
         <ul className="list-disc space-y-1.5 pl-5">
           <li><strong>Scaleway</strong> (France) — hébergement de l&apos;application et envoi des emails (service d&apos;emails transactionnels).</li>
-          <li><strong>Supabase</strong> — base de données et authentification [RÉGION_HÉBERGEMENT_À_CONFIRMER].</li>
+          <li><strong>Supabase</strong> — base de données et authentification, hébergement en Union européenne.</li>
           <li><strong>Discord</strong> (Discord Inc., États-Unis) — connexion (OAuth) et envoi des messages Discord (salon ou message privé). Ce transfert hors UE est encadré par les garanties appropriées (clauses contractuelles types).</li>
         </ul>
         <p>Vos données ne sont jamais transmises à d&apos;autres tiers à des fins commerciales.</p>
@@ -85,7 +86,7 @@ export default function ConfidentialitePage() {
       <Section n="5" title="Durées de conservation">
         <ul className="list-disc space-y-1.5 pl-5">
           <li>Préférences et comptes de réception : tant que votre compte / lien avec le Club est actif.</li>
-          <li>Journaux d&apos;envoi : [DURÉE_LOGS, ex. 12 mois] à des fins de suivi et de preuve d&apos;acheminement.</li>
+          <li>Journaux d&apos;envoi : 12 mois à des fins de suivi et de preuve d&apos;acheminement.</li>
           <li>Données de compte : supprimées à la suppression du compte, sauf obligation légale de conservation.</li>
         </ul>
       </Section>
@@ -98,7 +99,7 @@ export default function ConfidentialitePage() {
         <p>
           Vous pouvez exercer une grande partie de ces droits directement dans le Service : choisir vos notifications,
           changer de compte de réception, activer « ne pas déranger », ou vous désabonner en un clic depuis un email reçu.
-          Pour les autres demandes, contactez le Club concerné (responsable de traitement) ou Quatools à [EMAIL_CONTACT] —
+          Pour les autres demandes, contactez le Club concerné (responsable de traitement) ou Quatools à alexandre@quatools.fr —
           Quatools relaiera la demande au Club le cas échéant.
         </p>
         <p>
@@ -124,7 +125,7 @@ export default function ConfidentialitePage() {
 
       <Section n="9" title="Contact et modifications">
         <p>
-          Pour toute question relative à cette politique : [EMAIL_CONTACT]. Cette politique peut être mise à jour ; la date
+          Pour toute question relative à cette politique : alexandre@quatools.fr. Cette politique peut être mise à jour ; la date
           de dernière mise à jour figure en haut de page.
         </p>
         <p className="text-muted-foreground">
