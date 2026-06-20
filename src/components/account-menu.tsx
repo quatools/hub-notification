@@ -14,6 +14,7 @@ export function AccountMenu() {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [name, setName] = useState<string | null>(null)
   const [email, setEmail] = useState<string | null>(null)
+  const [avatar, setAvatar] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
@@ -23,6 +24,8 @@ export function AccountMenu() {
       const m = (u.user_metadata || {}) as Record<string, string>
       setName(m.full_name || m.name || u.email || null)
       setEmail(u.email || null)
+      // Discord / Google / GitHub exposent la photo via avatar_url ou picture.
+      setAvatar(m.avatar_url || m.picture || null)
     })
   }, [supabase])
 
@@ -54,15 +57,25 @@ export function AccountMenu() {
       <button
         onClick={() => setOpen((o) => !o)}
         title={name}
-        className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-secondary text-xs font-semibold text-muted-foreground hover:text-foreground"
+        className="flex h-8 w-8 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-border bg-secondary text-xs font-semibold text-muted-foreground hover:text-foreground"
       >
-        {initials}
+        {avatar ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={avatar} alt="" className="h-full w-full object-cover" />
+        ) : (
+          initials
+        )}
       </button>
       {open && (
         <div className="absolute right-0 top-[calc(100%+8px)] z-30 w-72 rounded-xl border bg-popover p-2 shadow-lg">
           <div className="flex items-center gap-3 px-2.5 pb-3 pt-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-muted-foreground">
-              {initials}
+            <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-secondary text-xs font-semibold text-muted-foreground">
+              {avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatar} alt="" className="h-full w-full object-cover" />
+              ) : (
+                initials
+              )}
             </span>
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold">{name}</div>
