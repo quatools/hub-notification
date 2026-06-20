@@ -1,0 +1,93 @@
+name: Deploy prod
+
+# Build sur le runner GitHub (machine costaude, disque large) puis envoi du seul
+# bundle `standalone` au VPS par SSH. Le VPS ne build plus rien → fini la
+# pression disque. Les secrets serveur (SMTP, bot, service_role, MCP…) restent
+# dans le .env du VPS et ne transitent JAMAIS par GitHub : seules les variables
+# NEXT_PUBLIC_* (publiques, destinées au navigateur) sont injectées au build.
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build (NEXT_PUBLIC_* prod inlinés)
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
+          NEXT_PUBLIC_ALLOW_INDEXING: ${{ secrets.NEXT_PUBLIC_ALLOW_INDEXING }}
+          NEXT_PUBLIC_DISCORD_APP_ID: ${{ secrets.NEXT_PUBLIC_DISCORD_APP_ID }}
+        run: npm run build
+
+      - name: Assemble le bundle standalone
+        run: |
+          cp -r .next/static .next/standalone/.next/static
+          cp -r public .next/standalone/public
+          tar czf deploy.tar.gz -C .next standalone
+
+      - name: Prépare SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Envoie le bundle
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: scp -i ~/.ssh/id_ed25519 deploy.tar.gz "$VPS_USER@$VPS_HOST:/root/deploy.tar.gz"
+
+      - name: Déploie (swap atomique + health check + rollback)
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh -i ~/.ssh/id_ed25519 "$VPS_USER@$VPS_HOST" 'bash -s' <<'EOSSH'
+          set -e
+          cd /root/hub-notification-prod
+          rm -rf .next/standalone.new .next/standalone.old
+          mkdir -p .next/standalone.new
+          # Le tar contient un dossier racine `standalone/` → on le retire.
+          tar xzf /root/deploy.tar.gz -C .next/standalone.new --strip-components=1
+          # Secrets runtime : on réutilise le .env persistant du VPS (jamais dans le bundle).
+          cp .env .next/standalone.new/.env
+          # Bascule atomique, avec sauvegarde de l'ancien build pour rollback.
+          mv .next/standalone .next/standalone.old
+          mv .next/standalone.new .next/standalone
+          if systemctl restart hub-notification-prod \
+             && sleep 4 \
+             && systemctl is-active --quiet hub-notification-prod \
+             && curl -fsS -o /dev/null http://localhost:3002/login; then
+            echo "DEPLOY_OK"
+            rm -rf .next/standalone.old /root/deploy.tar.gz
+          else
+            echo "DEPLOY_FAILED -> rollback vers l'ancien build"
+            rm -rf .next/standalone
+            mv .next/standalone.old .next/standalone
+            systemctl restart hub-notification-prod
+            exit 1
+          fi
+          EOSSH
