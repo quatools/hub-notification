@@ -1,11 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/server'
+import { getOrgsByIds, type OrgRef } from '@/lib/auth/orgs'
 
-export interface MemberOrg {
-  club_id: string
-  club_name: string
-  club_slug: string | null
-  role: string
-}
+export type MemberOrg = OrgRef
 
 /**
  * Organisations dont l'utilisateur est DESTINATAIRE (membre), dérivées de
@@ -59,16 +55,6 @@ export async function getMemberOrgs(authUserId: string): Promise<MemberOrg[]> {
   const orgIds = Array.from(orgIdSet)
   if (orgIds.length === 0) return []
 
-  // 3. Noms des clubs
-  const { data: clubs } = await supabase
-    .from('clubs')
-    .select('id, name, slug')
-    .in('id', orgIds)
-
-  return ((clubs as { id: string; name: string; slug: string | null }[] | null) || []).map((c) => ({
-    club_id: c.id,
-    club_name: c.name,
-    club_slug: c.slug,
-    role: 'member',
-  }))
+  // 3. Noms des orgs (clubs BAAS ∪ orgs hub)
+  return getOrgsByIds(orgIds)
 }

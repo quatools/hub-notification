@@ -16,6 +16,10 @@ export interface LinkTokenPayload {
   email?: string
   discord_id?: string
   name?: string
+  // Portée du lien : 'member' (rattachement, défaut) ou 'admin' (octroi de droits
+  // d'administration sur org_id). Pour 'admin', org_id est requis.
+  scope?: 'member' | 'admin'
+  org_id?: string
   exp: number // unix seconds
 }
 

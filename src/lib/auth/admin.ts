@@ -1,5 +1,6 @@
 import { getAuthenticatedUser } from '@/lib/supabase/api-auth'
 import { createServiceClient } from '@/lib/supabase/server'
+import { isOrgAdmin, listAdminOrgs, type OrgRef } from '@/lib/auth/orgs'
 
 interface AdminAuthResult {
   user_id: string
@@ -7,8 +8,8 @@ interface AdminAuthResult {
 }
 
 /**
- * Vérifie que l'utilisateur est authentifié et admin du club (org).
- * Vérifie dans la table public.club_admins du BAAS.
+ * Vérifie que l'utilisateur est authentifié et admin de l'org.
+ * Droits résolus en UNION : club_admins du BAAS OU org_admins du hub (Storm…).
  */
 export async function getAdminAuth(orgId: string | null): Promise<AdminAuthResult | null> {
   if (!orgId) return null
@@ -16,16 +17,7 @@ export async function getAdminAuth(orgId: string | null): Promise<AdminAuthResul
   const user = await getAuthenticatedUser()
   if (!user) return null
 
-  const supabase = createServiceClient()
-  const { data: admin } = await supabase
-    .from('club_admins')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('club_id', orgId)
-    .eq('is_active', true)
-    .single()
-
-  if (!admin) return null
+  if (!(await isOrgAdmin(user.id, orgId))) return null
 
   return {
     user_id: user.id,
@@ -34,21 +26,11 @@ export async function getAdminAuth(orgId: string | null): Promise<AdminAuthResul
 }
 
 /**
- * Retourne la liste des clubs dont l'utilisateur est admin.
+ * Retourne la liste des organisations dont l'utilisateur est admin
+ * (clubs BAAS ∪ orgs hub).
  */
-export async function getUserClubs(userId: string): Promise<Array<{
-  club_id: string
-  club_name: string
-  club_slug: string
-  role: string
-}>> {
-  const supabase = createServiceClient()
-  const { data, error } = await supabase.rpc('get_user_clubs', {
-    user_uuid: userId,
-  })
-
-  if (error || !data) return []
-  return data
+export async function getUserClubs(userId: string): Promise<OrgRef[]> {
+  return listAdminOrgs(userId)
 }
 
 /**

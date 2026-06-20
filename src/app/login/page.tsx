@@ -14,10 +14,15 @@ function safeNext(next: string | null): string {
   return safeInternalPath(next)
 }
 
+/** Lien de rattachement MEMBRE (et non /api/link-admin, qui garde l'accueil par défaut). */
+function isMemberLinkPath(next: string): boolean {
+  return next.startsWith("/api/link?") || next === "/api/link"
+}
+
 /** Décode (sans vérifier) le jeton de rattachement pour personnaliser l'accueil. */
 function decodeLinkInfo(next: string): { isMemberLink: boolean; name?: string } {
   try {
-    if (!next.startsWith("/api/link")) return { isMemberLink: false }
+    if (!isMemberLinkPath(next)) return { isMemberLink: false }
     const token = new URL(next, "http://x").searchParams.get("token")
     if (!token) return { isMemberLink: true }
     let b = token.split(".")[0].replace(/-/g, "+").replace(/_/g, "/")
@@ -25,7 +30,7 @@ function decodeLinkInfo(next: string): { isMemberLink: boolean; name?: string } 
     const payload = JSON.parse(atob(b))
     return { isMemberLink: true, name: payload?.name || undefined }
   } catch {
-    return { isMemberLink: next.startsWith("/api/link") }
+    return { isMemberLink: isMemberLinkPath(next) }
   }
 }
 

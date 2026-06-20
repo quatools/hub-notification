@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { randomToken } from '@/lib/oauth/jwt'
+import { isOrgAdmin } from '@/lib/auth/orgs'
 import { baseUrl, mcpResource } from '@/lib/oauth/base-url'
 
 export const runtime = 'nodejs'
@@ -96,16 +97,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // 3. L'utilisateur est-il admin actif de cette org ?
-  const { data: admin } = await supabaseAdmin
-    .from('club_admins')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('club_id', orgId)
-    .eq('is_active', true)
-    .maybeSingle()
-
-  if (!admin) {
+  // 3. L'utilisateur est-il admin de cette org ? (club_admins BAAS ∪ org_admins hub)
+  if (!(await isOrgAdmin(user.id, orgId))) {
     return htmlError(
       "Vous n'êtes pas administrateur de cette organisation. Demandez à un administrateur de vous inviter, puis réessayez.",
       403

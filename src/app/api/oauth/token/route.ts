@@ -15,6 +15,7 @@ import {
   hashToken,
   accessTokenTtlSeconds,
 } from '@/lib/oauth/jwt'
+import { isOrgAdmin } from '@/lib/auth/orgs'
 import { baseUrl } from '@/lib/oauth/base-url'
 
 export const runtime = 'nodejs'
@@ -111,16 +112,9 @@ export async function POST(request: NextRequest) {
         return err('invalid_grant', 'Refresh token expiré')
       }
 
-      // Defense-in-depth : l'utilisateur est-il toujours admin actif de l'org ?
-      const { data: admin } = await supabase
-        .from('club_admins')
-        .select('id')
-        .eq('user_id', rt.user_id)
-        .eq('club_id', rt.club_id)
-        .eq('is_active', true)
-        .maybeSingle()
-
-      if (!admin) {
+      // Defense-in-depth : l'utilisateur est-il toujours admin de l'org ?
+      // (club_admins BAAS ∪ org_admins hub)
+      if (!(await isOrgAdmin(rt.user_id, rt.club_id))) {
         await supabase.from('oauth_refresh_tokens').update({ revoked: true }).eq('id', rt.id)
         return err('invalid_grant', "Droits d'administration révoqués pour cette organisation", 403)
       }

@@ -5,8 +5,8 @@
  */
 
 import { NextRequest } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
 import { verifyAccessToken } from '@/lib/oauth/jwt'
+import { isOrgAdmin } from '@/lib/auth/orgs'
 import { baseUrl, mcpResource } from '@/lib/oauth/base-url'
 
 export type McpAuthResult =
@@ -40,17 +40,8 @@ export async function authenticateMcp(request: NextRequest, orgId: string): Prom
     return { ok: false, status: 401, error: 'Token non valide pour cette organisation' }
   }
 
-  // L'utilisateur est-il toujours admin actif de l'org ?
-  const supabase = createServiceClient()
-  const { data: admin } = await supabase
-    .from('club_admins')
-    .select('id')
-    .eq('user_id', claims.sub)
-    .eq('club_id', orgId)
-    .eq('is_active', true)
-    .maybeSingle()
-
-  if (!admin) {
+  // L'utilisateur est-il toujours admin de l'org ? (club_admins BAAS ∪ org_admins hub)
+  if (!(await isOrgAdmin(claims.sub, orgId))) {
     return { ok: false, status: 403, error: "Vous n'êtes pas administrateur de cette organisation" }
   }
 
