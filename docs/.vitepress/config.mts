@@ -56,6 +56,7 @@ export default defineConfig({
         items: [
           { text: 'Vue d’ensemble & auth', link: '/api/overview' },
           { text: 'POST /register', link: '/api/register' },
+          { text: 'POST /orgs', link: '/api/orgs' },
           { text: 'POST /emit', link: '/api/emit' },
           { text: 'API Admin', link: '/api/admin' },
           { text: 'API Membre', link: '/api/user' },

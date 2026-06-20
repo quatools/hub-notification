@@ -55,6 +55,38 @@ cette clé pour authentifier la demande.
   préservé, puis reprise.
 - **Jeton invalide ou expiré** → erreur, aucune fiche modifiée.
 
+## Lien admin (octroi de droits)
+
+Le même mécanisme de jeton sert à **donner les droits d'administration** d'une
+organisation hub (créée via [`/orgs`](/api/orgs)) à un utilisateur — utile pour
+les applications tierces dont les organisations ne sont pas des clubs esport.
+
+Le jeton porte alors `scope: "admin"` et l'`org_id` ciblé :
+
+| Champ | Description |
+|---|---|
+| `app` | Nom de l'app (doit **posséder** l'org). |
+| `app_user_id` | Id de l'admin côté app. |
+| `scope` | `"admin"`. |
+| `org_id` | L'organisation à administrer. |
+| `name`, `email`, `discord_id` | Optionnels. |
+| `exp` | Expiration courte. |
+
+L'app redirige l'admin qu'elle vouche vers :
+
+```text
+https://hub.quatools.fr/api/link-admin?token=<JETON>
+```
+
+Le hub vérifie la signature, **que l'org appartient bien à l'app** qui signe
+(anti-usurpation inter-app), exige une session hub (login si besoin), puis
+enregistre l'utilisateur comme **admin de l'org**. Redirection vers
+`/admin?org=<org_id>`, où il configure canaux et workflows comme pour un club.
+
+::: tip Idempotent
+Ré-ouvrir le lien ne crée pas de doublon : l'utilisateur reste simplement admin.
+:::
+
 ## Page de rattachement (à venir)
 
 Une **landing de rattachement** pédagogique en marque blanche est prévue pour

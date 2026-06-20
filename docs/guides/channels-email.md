@@ -11,6 +11,13 @@ en particulier aucun fournisseur US — c'est un choix de souveraineté.
 | **Membre concerné** | `recipient: "member"` | L'email du membre fourni dans `recipients`. |
 | **Adresse fixe** | `email: "contact@club.fr"` | Toujours la même adresse. |
 
+::: tip Créable depuis l'interface
+Dans `/admin` → *Canaux* → *Ajouter un canal* → *Email*, choisissez
+**« Au membre concerné »** ou **« Adresse fixe »** — exactement comme pour le MP
+Discord. Bonne pratique : créez d'abord un canal vers **votre propre adresse**
+pour tester la réception réelle avant de router vers les membres.
+:::
+
 ## SMTP côté hub
 
 L'envoi s'appuie sur des variables d'environnement, communes à toutes les

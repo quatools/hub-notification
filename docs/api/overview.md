@@ -51,6 +51,7 @@ et par le serveur MCP — vos applications n'ont normalement pas à les appeler.
 ## Pages de référence
 
 - [POST /register](/api/register) — déclarer ses événements
+- [POST /orgs](/api/orgs) — déclarer une organisation (apps tierces)
 - [POST /emit](/api/emit) — émettre une notification
 - [API Admin](/api/admin) — canaux, workflows, logs, marque blanche
 - [API Membre](/api/user) — opt-out, canaux perso, historique

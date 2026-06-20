@@ -59,6 +59,22 @@ des clés de fusion. Voir [Destinataires & identités](/concepts/recipients-iden
 | `user_optouts` | Refus d'un workflow | `user_id` (legacy), `recipient_id` (CDC v2), `workflow_id` |
 | `org_settings` | Identité d'expéditeur par org | `org_id` (PK), `sender_name`, `reply_to`, `sender_domain`, `sender_local_part`, `domain_status`, `domain_dns_records` |
 
+### Organisations & droits (hub)
+
+| Table | Rôle | Colonnes clés |
+|---|---|---|
+| `organizations` | Organisations **possédées par le hub** (apps tierces) | `id` (= l'`org_id`), `app`, `external_id`, `name`, `slug`, `source` ; unique `(app, external_id)` |
+| `org_admins` | Droits d'admin sur une org hub | `org_id`, `auth_user_id`, `role` ; unique `(org_id, auth_user_id)` |
+
+::: info Union avec le BAAS, sans migration
+Les droits et noms d'organisation sont résolus en **union** de deux sources :
+les clubs du BAAS (`public.clubs` / `public.club_admins`) **et** ces tables hub.
+Aucune donnée BAAS n'est déplacée : une app comme Storm a ses propres
+organisations sans toucher au BAAS. Les `org_id` sont des UUID → aucune collision
+entre les deux sources. Voir [`/orgs`](/api/orgs) et le
+[lien admin](/api/link#lien-admin-octroi-de-droits).
+:::
+
 ## Fonctions notables
 
 | Fonction | Rôle |
@@ -67,20 +83,27 @@ des clés de fusion. Voir [Destinataires & identités](/concepts/recipients-iden
 | `merge_recipients(keep, drop)` | Fusionne deux fiches sans perte (identités, canaux, opt-out, exécutions). |
 | `set_updated_at()` | Trigger d'horodatage sur toutes les tables. |
 
-## RLS en bref
+## RLS & accès en bref
 
-- **events** : lecture pour tout authentifié (catalogue public interne).
-- **channels / user_optouts / recipients / recipient_identities / executions** :
-  un utilisateur ne voit/écrit que **ses propres** lignes (`auth.uid()`).
-- **workflows / workflow_steps / org_settings** : lecture authentifiée, l'API
-  filtre par org ; les écritures passent par le **service role** (API admin).
+Depuis le durcissement (migration `013`), **aucun rôle `anon`/`authenticated`
+n'a d'accès direct** aux tables du schéma `notifications` : tout passe par le
+**service role**, côté serveur, via les routes `/api/*`. Le client navigateur ne
+sert qu'à l'**authentification** (schéma `auth`). Les policies RLS subsistent en
+défense en profondeur. Les tables `organizations` et `org_admins` suivent la
+même règle : service role uniquement.
+
+::: tip Invariant
+Le front n'accède **jamais** aux tables `notifications` en direct. Verrouiller
+ces tables est donc sans impact fonctionnel — et coupe tout accès inter-tenant.
+:::
 
 ## Migrations
 
-Les migrations vivent dans `supabase/migrations/` (de `001` à `010`) :
-schéma initial, seeds d'exemple, identité d'expéditeur, support DM Discord,
-résolveur Discord, recipients/identités (CDC v2), fusion, destination
-d'exécution.
+Les migrations vivent dans `supabase/migrations/` (de `001` à `015`) : schéma
+initial, seeds d'exemple, identité d'expéditeur, support DM Discord, résolveur
+Discord, recipients/identités (CDC v2), fusion, destination d'exécution,
+préférences membre, désabonnement, **durcissement RLS (`013`)** et
+**organisations propres au hub (`015`)**.
 
 ::: warning Seeds d'exemple
 Les migrations `002`/`003` *seedent* des événements `baas.*` (esport) à titre

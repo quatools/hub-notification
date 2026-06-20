@@ -48,7 +48,7 @@ couleur des embeds Discord.
 ## Le `payload_schema` n'est pas une validation
 
 Le `payload_schema` est **documentaire** : il indique à l'admin quelles
-variables `{{…}}` il peut utiliser dans ses messages. Le hub ne rejette pas un
+variables <code v-pre>{{…}}</code> il peut utiliser dans ses messages. Le hub ne rejette pas un
 `emit` dont le payload diffère du schéma — une variable absente est simplement
 rendue vide. Gardez donc le schéma à jour pour l'expérience admin, mais
 considérez le payload réel comme la source de vérité.

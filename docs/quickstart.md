@@ -10,6 +10,30 @@ pour qu'ils soient réellement envoyés.
 - L'**URL de base** du hub (ex. `https://hub.quatools.fr`).
 :::
 
+## Déclarer son organisation (applications tierces)
+
+Si vos organisations **ne sont pas** des clubs esport du BAAS, déclarez-les
+d'abord pour obtenir un `org_id` :
+
+```http
+POST /api/notifications/orgs
+Authorization: Bearer <API_KEY>
+Content-Type: application/json
+
+{ "external_id": "votre-id-interne", "name": "Nom de l'organisation" }
+```
+
+Réponse : `{ "org_id": "…", "created": true }`. Stockez l'`org_id` (idempotent
+par `external_id`), il sert pour tout le reste. Pour donner les droits à un
+administrateur humain, utilisez le
+[lien admin](/api/link#lien-admin-octroi-de-droits). Détails :
+[`/orgs`](/api/orgs).
+
+::: info BAAS esport ?
+Si vous émettez au nom de clubs existants, sautez cette étape : votre `org_id`
+est l'id du club.
+:::
+
 ## 1. Déclarer ses événements
 
 Au démarrage de votre app (ou via un script de seed), déclarez les événements
