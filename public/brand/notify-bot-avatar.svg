@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Fond (Discord recadre en cercle, le fond plein rend le crop propre) -->
+  <rect width="512" height="512" rx="116" fill="#16283B"/>
+
+  <!-- Branches du hub -->
+  <g stroke="#F4F0E8" stroke-width="20" stroke-linecap="round">
+    <path d="M256 168 V104"/>
+    <path d="M256 344 V408"/>
+    <path d="M168 256 H104"/>
+    <path d="M344 256 H408"/>
+  </g>
+
+  <!-- Nœuds (crème) -->
+  <circle cx="256" cy="408" r="17" fill="#F4F0E8"/>
+  <circle cx="104" cy="256" r="17" fill="#F4F0E8"/>
+  <circle cx="408" cy="256" r="17" fill="#F4F0E8"/>
+
+  <!-- "Ping" de notification (cuivre) en haut, avec halo -->
+  <circle cx="256" cy="100" r="40" fill="none" stroke="#C05B2E" stroke-width="6" opacity="0.30"/>
+  <circle cx="256" cy="100" r="26" fill="#C05B2E"/>
+
+  <!-- Tête = le carré central du hub -->
+  <rect x="168" y="168" width="176" height="176" rx="52" fill="#F4F0E8"/>
+
+  <!-- Yeux + reflets -->
+  <circle cx="224" cy="250" r="17" fill="#16283B"/>
+  <circle cx="288" cy="250" r="17" fill="#16283B"/>
+  <circle cx="230" cy="244" r="5" fill="#F4F0E8"/>
+  <circle cx="294" cy="244" r="5" fill="#F4F0E8"/>
+
+  <!-- Sourire -->
+  <path d="M222 292 Q256 318 290 292" fill="none" stroke="#16283B" stroke-width="12" stroke-linecap="round"/>
+</svg>
