@@ -21,9 +21,14 @@ Concept détaillé : [Destinataires & identités](/concepts/recipients-identity)
 
 ## Le jeton de rattachement
 
-Le jeton est signé en **HMAC-SHA256** avec la **clé API de l'app** comme secret,
+Le jeton est signé en **HMAC-SHA256** avec le **secret de signature de l'app**,
 et porte une **courte durée de validité** (≈ 2 min) pour éviter le rejeu et
 l'usurpation d'identité.
+
+Le secret de signature dépend du type d'app :
+- **app self-service** (créée dans l'espace développeur) : le **`signing_secret`**
+  dédié, affiché dans l'encart d'intégration (distinct de la clé API) ;
+- **app historique** (clé en environnement) : la **clé API** fait office de secret.
 
 Charge utile typique :
 
