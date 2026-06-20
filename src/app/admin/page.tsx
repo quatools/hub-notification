@@ -123,11 +123,12 @@ export default function AdminDashboardPage() {
     return (
       <div className="mx-auto max-w-lg py-16 text-center">
         <AlertCircle className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-        <h2 className="mb-2 text-xl font-semibold">Aucune application configurée</h2>
+        <h2 className="mb-2 text-xl font-semibold">Aucune organisation associée</h2>
         <p className="text-sm text-muted-foreground">
-          Aucune application n&apos;est encore connectée au hub pour votre compte. Pour commencer,
-          configurez la vôtre dans l&apos;espace développeur : créez votre application et générez
-          votre clé d&apos;intégration.
+          Deux possibilités : <strong>configurez votre application</strong> pour la connecter au hub
+          (créez-la et générez votre clé dans l&apos;espace développeur), ou <strong>rattachez vos
+          notifications</strong> depuis une plateforme partenaire Quatools — via le bouton
+          « Gérer mes notifications » de cette plateforme.
         </p>
         <div className="mt-6 flex items-center justify-center gap-3">
           <Button asChild>
