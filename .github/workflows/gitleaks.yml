@@ -20,9 +20,11 @@ jobs:
           # Profondeur 0 = tout l'historique, pour scanner aussi les anciens commits.
           fetch-depth: 0
 
-      - name: gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # GITLEAKS_LICENSE n'est requis QUE pour les dépôts d'organisation GitHub.
-          # Pour un compte personnel / dépôt public, le scan est gratuit sans licence.
+      - name: gitleaks (binaire open-source, sans licence)
+        # L'action gitleaks-action@v2 est devenue payante pour les organisations.
+        # On utilise le binaire open-source (MIT), gratuit et sans licence.
+        run: |
+          VER=8.18.4
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VER}/gitleaks_${VER}_linux_x64.tar.gz" -o gl.tgz
+          tar -xzf gl.tgz gitleaks
+          ./gitleaks detect --source . --redact --no-banner --config .gitleaks.toml --exit-code 1
