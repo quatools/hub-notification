@@ -73,8 +73,11 @@ export const BAAS_EVENTS: RegisterRequest = {
       label: 'Nouveau membre',
       description: 'Un nouveau membre a rejoint le club',
       category: 'member',
-      supported_channels: ['discord_webhook'],
-      audiences: ['admin'],
+      // email + discord_dm pour permettre un MAIL (ou MP) DE BIENVENUE adressé au
+      // nouveau membre ; audience 'member' pour qu'il puisse gérer/refuser cette
+      // notif. Émis par le BAAS à la 1re adhésion du membre au club.
+      supported_channels: ['email', 'discord_webhook', 'discord_dm'],
+      audiences: ['admin', 'member'],
       default_active: true,
       payload_schema: {
         member_name: 'string',
