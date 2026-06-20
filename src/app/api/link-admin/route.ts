@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyLinkToken } from '@/lib/notifications/link-token'
 import { getAuthenticatedUser } from '@/lib/supabase/api-auth'
 import { createServiceClient } from '@/lib/supabase/server'
+import { addOrgAdmin, orgHasOwner } from '@/lib/auth/org-team'
 import { baseUrl } from '@/lib/oauth/base-url'
 
 export const runtime = 'nodejs'
@@ -62,17 +63,13 @@ export async function GET(request: NextRequest) {
     return htmlError('Organisation inconnue pour cette application.', 404)
   }
 
-  // Enregistre l'admin (idempotent grâce à l'index unique org_id+auth_user_id).
-  const { error } = await supabase
-    .schema('notifications')
-    .from('org_admins')
-    .upsert(
-      { org_id: payload.org_id, auth_user_id: user.id },
-      { onConflict: 'org_id,auth_user_id' }
-    )
-
-  if (error) {
-    return htmlError(`Erreur lors de l'attribution des droits : ${error.message}`, 500)
+  // Premier admin de la structure → owner ; les suivants → admin.
+  // (addOrgAdmin ne rétrograde jamais un membre existant.)
+  try {
+    const role = (await orgHasOwner(payload.org_id)) ? 'admin' : 'owner'
+    await addOrgAdmin(payload.org_id, user.id, role)
+  } catch (e) {
+    return htmlError(`Erreur lors de l'attribution des droits : ${e instanceof Error ? e.message : 'inconnue'}`, 500)
   }
 
   return NextResponse.redirect(new URL(`/admin?org=${payload.org_id}`, base))
