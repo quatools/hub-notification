@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
-import { LogOut, Shield, User, Check, Zap, Settings } from "lucide-react"
+import { LogOut, Shield, User, Check, Zap, Settings, Code } from "lucide-react"
 
 /** Avatar + menu compte : bascule d'espace (admin / membre) et déconnexion. */
 export function AccountMenu() {
@@ -41,6 +41,7 @@ export function AccountMenu() {
     : name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()
   const isAdmin = pathname.startsWith("/admin")
   const isUser = pathname.startsWith("/preferences")
+  const isDeveloper = pathname.startsWith("/developer")
 
   const logout = async () => {
     await supabase.auth.signOut()
@@ -98,6 +99,20 @@ export function AccountMenu() {
                 <span className="block text-xs text-muted-foreground">Mes notifications perso</span>
               </span>
               {isUser && <Check className="h-4 w-4 text-[color:var(--qt-copper-500)]" />}
+            </Link>
+            <Link
+              href="/developer"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 hover:bg-secondary"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
+                <Code className="h-4 w-4" />
+              </span>
+              <span className="flex-1">
+                <span className="block text-[13px] font-semibold">Espace développeur</span>
+                <span className="block text-xs text-muted-foreground">Mes applications &amp; clés API</span>
+              </span>
+              {isDeveloper && <Check className="h-4 w-4 text-[color:var(--qt-copper-500)]" />}
             </Link>
           </div>
 

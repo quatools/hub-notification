@@ -5,7 +5,7 @@ import type { RegisterRequest, RegisterResponse } from '@/lib/types/notification
 
 export async function POST(request: NextRequest) {
   // 1. Auth par API key
-  const auth = validateApiKey(request)
+  const auth = await validateApiKey(request)
   if (!auth.valid) {
     return NextResponse.json({ error: 'API key invalide' }, { status: 401 })
   }

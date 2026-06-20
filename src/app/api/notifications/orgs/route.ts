@@ -14,7 +14,7 @@ import { validateApiKey } from '@/lib/auth/api-key'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export async function POST(request: NextRequest) {
-  const auth = validateApiKey(request)
+  const auth = await validateApiKey(request)
   if (!auth.valid) {
     return NextResponse.json({ error: 'API key invalide' }, { status: 401 })
   }

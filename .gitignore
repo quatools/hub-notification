@@ -2,6 +2,11 @@
 
 # dependencies
 /node_modules
+docs/node_modules/
+
+# docs (VitePress) build artifacts
+docs/.vitepress/dist/
+docs/.vitepress/cache/
 /.pnp
 .pnp.*
 .yarn/*

@@ -6,7 +6,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 // État de configuration des notifications d'une org : pour que l'app appelante
 // affiche « non configuré » / « actif · N workflows » (façon Stripe Connect).
 export async function GET(request: NextRequest) {
-  const auth = validateApiKey(request)
+  const auth = await validateApiKey(request)
   if (!auth.valid) {
     return NextResponse.json({ error: 'API key invalide' }, { status: 401 })
   }

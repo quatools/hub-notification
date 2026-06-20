@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateApiKey } from '@/lib/auth/api-key'
+import { checkAppSendGate, incrementAppSendCount } from '@/lib/notifications/app-limits'
 import { createServiceClient } from '@/lib/supabase/server'
 import { resolveRoutes, type RouteResult } from '@/lib/notifications/routing'
 import { renderTemplate } from '@/lib/notifications/templates'
@@ -12,9 +13,18 @@ import type { EmitRequest, EmitResponse, NotificationEvent } from '@/lib/types/n
 
 export async function POST(request: NextRequest) {
   // 1. Auth par API key
-  const auth = validateApiKey(request)
+  const auth = await validateApiKey(request)
   if (!auth.valid) {
     return NextResponse.json({ error: 'API key invalide' }, { status: 401 })
+  }
+
+  // 1b. Garde-fou self-service : une app en base bloquée ou ayant atteint son
+  // plafond d'essai ne peut plus émettre (les clés env ne sont pas concernées).
+  if (auth.appId) {
+    const gate = await checkAppSendGate(auth.appId)
+    if (!gate.allowed) {
+      return NextResponse.json({ error: gate.reason }, { status: 403 })
+    }
   }
 
   // 2. Parser le body
@@ -361,6 +371,13 @@ export async function POST(request: NextRequest) {
     executionIds.push(execution.id)
     channelTypes.add(route.channel_type)
     toDispatch.push({ executionId: execution.id, job })
+  }
+
+  // Comptabiliser les envois réels (hors échecs « pas d'identité ») pour le
+  // plafond d'essai des apps self-service.
+  if (auth.appId) {
+    const realSends = toDispatch.filter((d) => !d.job.skipReason).length
+    void incrementAppSendCount(auth.appId, realSends)
   }
 
   // Envoi effectif (en arrière-plan, NON attendu).
