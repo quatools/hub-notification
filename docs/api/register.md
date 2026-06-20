@@ -4,6 +4,16 @@ Déclare (ou met à jour) les événements qu'une application sait émettre.
 C'est un **upsert** par `slug` : ré-appeler avec un slug existant met
 l'événement à jour.
 
+::: tip Aucune migration, aucun déploiement du hub
+Déclarer ou modifier des événements **et leurs variables** se fait **uniquement**
+par cet appel `/register` — **jamais** par une migration SQL ou un déploiement
+côté hub. Le `payload_schema` est un champ JSON souple et **purement documentaire** :
+émettre une nouvelle variable la rend telle quelle (aucune validation), et la
+re-déclarer ici la fait simplement apparaître à l'admin dans l'éditeur de message.
+Les migrations SQL du dépôt ne concernent **que la structure interne du hub**,
+jamais vos événements ou vos variables.
+:::
+
 ## Quand l'appeler
 
 - au démarrage de l'application, ou via un script de seed ;
