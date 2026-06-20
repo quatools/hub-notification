@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get('token')
   if (!token) return htmlError('Lien d\'administration incomplet (token manquant).')
 
-  const payload = verifyLinkToken(token)
+  const payload = await verifyLinkToken(token)
   if (!payload) return htmlError('Lien d\'administration invalide ou expiré. Relancez depuis votre application.')
   if (payload.scope !== 'admin' || !payload.org_id) {
     return htmlError('Lien d\'administration invalide (portée incorrecte).')

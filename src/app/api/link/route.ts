@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get('token')
   if (!token) return htmlError('Lien de rattachement incomplet (token manquant).')
 
-  const payload = verifyLinkToken(token)
+  const payload = await verifyLinkToken(token)
   if (!payload) return htmlError('Lien de rattachement invalide ou expiré. Relancez depuis votre application.')
 
   const base = baseUrl(request)

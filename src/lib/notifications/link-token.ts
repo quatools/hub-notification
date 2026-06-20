@@ -1,13 +1,16 @@
 import { createHmac, timingSafeEqual } from 'crypto'
+import { createServiceClient } from '@/lib/supabase/server'
 
 /**
  * Token de rattachement signé (CDC v2).
  * L'app (BAAS, Storm…) forge ce token côté serveur pour son utilisateur
- * authentifié, le hub le vérifie. Signé en HMAC-SHA256 avec la **clé API de
- * l'app** (déjà partagée via NOTIFICATION_API_KEYS) → pas de nouveau secret.
+ * authentifié, le hub le vérifie. Signé en HMAC-SHA256 avec le **secret de
+ * signature de l'app** :
+ *   - apps historiques (env NOTIFICATION_API_KEYS) : la clé API sert de secret ;
+ *   - apps self-service (en base) : le `signing_secret` dédié de l'app.
  *
- * Garanties : seul un service connaissant la clé de l'app peut forger un token
- * valide (anti-usurpation) ; expiration courte (anti-rejeu).
+ * Garanties : seul un service connaissant le secret de l'app peut forger un
+ * token valide (anti-usurpation) ; expiration courte (anti-rejeu).
  */
 
 export interface LinkTokenPayload {
@@ -23,28 +26,47 @@ export interface LinkTokenPayload {
   exp: number // unix seconds
 }
 
-function appApiKey(app: string): string | null {
+/**
+ * Secret HMAC d'une app. L'env l'emporte (apps historiques inchangées) ; sinon
+ * on lit le `signing_secret` de l'app en base (self-service).
+ */
+async function appSigningSecret(app: string): Promise<string | null> {
+  // 1. Apps env (baas-esport…) : la clé API fait office de secret de signature.
   const raw = process.env.NOTIFICATION_API_KEYS
-  if (!raw) return null
+  if (raw) {
+    try {
+      const keys = JSON.parse(raw) as Record<string, string>
+      if (keys[app]) return keys[app]
+    } catch {
+      // env malformé : on tente la base
+    }
+  }
+  // 2. Apps en base (self-service) : signing_secret dédié.
   try {
-    const keys = JSON.parse(raw) as Record<string, string>
-    return keys[app] || null
+    const supabase = createServiceClient()
+    const { data } = await supabase
+      .schema('notifications')
+      .from('apps')
+      .select('signing_secret')
+      .eq('slug', app)
+      .maybeSingle()
+    return (data?.signing_secret as string | undefined) || null
   } catch {
     return null
   }
 }
 
 /** Forge un token (utilisé côté app ; fourni ici pour réutilisation/tests). */
-export function mintLinkToken(payload: LinkTokenPayload): string | null {
-  const key = appApiKey(payload.app)
+export async function mintLinkToken(payload: LinkTokenPayload): Promise<string | null> {
+  const key = await appSigningSecret(payload.app)
   if (!key) return null
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url')
   const sig = createHmac('sha256', key).update(body).digest('base64url')
   return `${body}.${sig}`
 }
 
-/** Vérifie un token : signature (clé de l'app du payload) + expiration. */
-export function verifyLinkToken(token: string): LinkTokenPayload | null {
+/** Vérifie un token : signature (secret de l'app du payload) + expiration. */
+export async function verifyLinkToken(token: string): Promise<LinkTokenPayload | null> {
   const parts = token.split('.')
   if (parts.length !== 2) return null
   const [body, sig] = parts
@@ -57,7 +79,7 @@ export function verifyLinkToken(token: string): LinkTokenPayload | null {
   }
   if (!payload.app || !payload.app_user_id) return null
 
-  const key = appApiKey(payload.app)
+  const key = await appSigningSecret(payload.app)
   if (!key) return null
 
   const expected = createHmac('sha256', key).update(body).digest('base64url')
