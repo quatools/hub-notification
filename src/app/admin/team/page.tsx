@@ -149,7 +149,7 @@ export default function TeamPage() {
             <DialogTrigger asChild>
               <Button className="shrink-0"><UserPlus className="mr-2 h-4 w-4" />Inviter</Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Inviter un membre</DialogTitle>
                 <DialogDescription>
@@ -175,7 +175,7 @@ export default function TeamPage() {
                 </div>
                 {inviteUrl ? (
                   <div className="flex items-center gap-2 rounded-lg border border-[#DAD4C6] bg-secondary/40 px-3 py-2.5">
-                    <code className="flex-1 truncate font-mono text-[12px]">{inviteUrl}</code>
+                    <code className="min-w-0 flex-1 truncate font-mono text-[12px]">{inviteUrl}</code>
                     <button
                       type="button"
                       onClick={() => { navigator.clipboard.writeText(inviteUrl); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
