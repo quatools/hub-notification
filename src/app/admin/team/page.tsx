@@ -114,10 +114,24 @@ export default function TeamPage() {
     else toast.error((await res.json()).error || "Erreur")
   }
 
-  if (clubLoading || !selectedClub || loading) {
+  if (clubLoading) {
     return <div className="mx-auto max-w-[720px] space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-24" /></div>
   }
-  if (!data) return null
+  if (!selectedClub) {
+    return (
+      <div className="mx-auto max-w-[720px] py-16 text-center">
+        <Users className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+        <h2 className="mb-2 text-xl font-semibold">Aucune structure à administrer</h2>
+        <p className="text-sm text-muted-foreground">
+          Ce compte n&apos;administre aucune structure. Rejoignez-en une via un lien d&apos;invitation,
+          ou sélectionnez-en une dans le menu en haut si vous en gérez plusieurs.
+        </p>
+      </div>
+    )
+  }
+  if (loading || !data) {
+    return <div className="mx-auto max-w-[720px] space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-24" /></div>
+  }
 
   const isOwner = data.my_role === "owner"
 
