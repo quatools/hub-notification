@@ -43,7 +43,7 @@ export function Navbar() {
         {isAdmin && !loading && clubs.length > 1 && (
           <Select value={selectedClub?.club_id || ""} onValueChange={selectClub}>
             <SelectTrigger className="h-8 w-auto gap-2 rounded-lg border-border bg-secondary pl-1.5 pr-2.5 text-[12.5px] font-semibold shadow-none">
-              <span className="flex h-5 w-5 items-center justify-center rounded bg-primary text-[10px] font-semibold text-primary-foreground">{initial}</span>
+              {/* Le badge est déjà rendu par SelectValue (contenu de l'item sélectionné). */}
               <SelectValue placeholder="Organisation" />
             </SelectTrigger>
             <SelectContent>
