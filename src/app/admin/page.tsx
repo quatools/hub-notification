@@ -121,10 +121,24 @@ export default function AdminDashboardPage() {
 
   if (clubs.length === 0) {
     return (
-      <div className="text-center py-12">
-        <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Aucune organisation</h2>
-        <p className="text-muted-foreground">Vous n&apos;êtes administrateur d&apos;aucune organisation.</p>
+      <div className="mx-auto max-w-lg py-16 text-center">
+        <AlertCircle className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+        <h2 className="mb-2 text-xl font-semibold">Aucune application configurée</h2>
+        <p className="text-sm text-muted-foreground">
+          Aucune application n&apos;est encore connectée au hub pour votre compte. Pour commencer,
+          configurez la vôtre dans l&apos;espace développeur : créez votre application et générez
+          votre clé d&apos;intégration.
+        </p>
+        <div className="mt-6 flex items-center justify-center gap-3">
+          <Button asChild>
+            <Link href="/developer">Configurer mon application</Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <a href="https://www.quatools.fr/hub/docs" target="_blank" rel="noopener noreferrer">
+              Documentation
+            </a>
+          </Button>
+        </div>
       </div>
     )
   }

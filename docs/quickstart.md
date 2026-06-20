@@ -4,10 +4,27 @@ Ce guide intègre une application au hub en trois étapes : **déclarer** ses
 événements, les **émettre**, et laisser un admin **configurer** un workflow
 pour qu'ils soient réellement envoyés.
 
-::: info Prérequis
-- Une **clé API** fournie par le hub (entrée dans `NOTIFICATION_API_KEYS`).
-- L'**`org_id`** (UUID de l'organisation) au nom de laquelle vous émettez.
-- L'**URL de base** du hub (ex. `https://hub.quatools.fr`).
+## Étape 1 — Récupérez votre clé d'intégration
+
+Tout commence par la création de votre **application** dans le hub :
+
+1. Connectez-vous au hub (**[hub.quatools.fr](https://hub.quatools.fr)**) — Discord, Google ou GitHub.
+2. Cliquez sur **votre avatar** (en haut à droite) → **Espace développeur**.
+3. **Nouvelle application** → un nom et un identifiant (ex. `storm`).
+4. **Générez une clé** → copiez-la (elle n'est affichée **qu'une seule fois**), ainsi que le **secret de signature**.
+
+Vous obtenez les variables à placer dans l'environnement de votre application :
+
+```text
+NOTIFICATION_HUB_URL=https://hub.quatools.fr
+NOTIFICATION_API_KEY=<votre clé>
+NOTIFICATION_SIGNING_SECRET=<votre secret de signature>
+```
+
+::: info Mode essai
+Une application démarre en **essai** (un petit nombre d'envois, suffisant pour valider
+l'intégration). Une fois votre intégration prête, l'opérateur la passe en « actif »
+après une revue rapide de ce qu'elle envoie.
 :::
 
 ## Déclarer son organisation (applications tierces)

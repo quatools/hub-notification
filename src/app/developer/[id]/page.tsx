@@ -259,7 +259,7 @@ export default function AppDetailPage() {
           </ol>
           <p className="mt-3 text-muted-foreground">
             Doc complète (lisible aussi par un agent IA) :{" "}
-            <a href={`${HUB_URL.replace("hub.", "www.")}/hub/docs/llms-full.txt`} target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
+            <a href="https://www.quatools.fr/hub/docs/llms-full.txt" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
               llms-full.txt
             </a>{" · "}
             <a href="https://www.quatools.fr/hub/docs" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
