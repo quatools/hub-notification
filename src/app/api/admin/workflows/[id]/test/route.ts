@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getDispatcher } from '@/lib/dispatchers'
 import { getSenderIdentity } from '@/lib/notifications/sender'
 import { resolveDiscordUserId } from '@/lib/notifications/discord-recipient'
+import { resolveUserEmail } from '@/lib/notifications/email-recipient'
 import { logExecution } from '@/lib/notifications/log-execution'
 import type { NotificationEvent } from '@/lib/types/notifications'
 
@@ -123,6 +124,19 @@ export async function POST(
       )
     }
     config = { ...channel.config, discord_user_id: discordId }
+  }
+
+  // Canal email "membre concerné" : sans adresse de test explicite, le test part
+  // à l'email de l'admin testeur lui-même (symétrique du MP Discord).
+  if (channel.type === 'email' && channel.config?.recipient === 'member' && !options.override_email) {
+    const email = await resolveUserEmail(auth.user_id)
+    if (!email) {
+      return NextResponse.json(
+        { error: "Aucune adresse email sur votre profil — précisez une adresse de test pour ce canal" },
+        { status: 400 }
+      )
+    }
+    config = { ...channel.config, email }
   }
 
   // Dispatcher

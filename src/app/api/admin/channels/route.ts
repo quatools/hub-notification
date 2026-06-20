@@ -93,11 +93,19 @@ export async function POST(request: NextRequest) {
   }
 
   if (body.type === 'email') {
-    const email = body.config.email as string
-    if (!email || !email.includes('@')) {
-      return NextResponse.json({ error: 'Adresse email invalide' }, { status: 400 })
+    // Mode "membre concerné" : pas d'adresse à saisir, résolue à l'envoi depuis
+    // l'email du membre concerné par l'événement (symétrique du MP Discord).
+    if (body.config.recipient === 'member') {
+      body.config = { recipient: 'member' }
+      isVerified = true
+      if (!body.label) body.label = 'Email au membre concerné'
+    } else {
+      const email = body.config.email as string
+      if (!email || !email.includes('@')) {
+        return NextResponse.json({ error: 'Adresse email invalide' }, { status: 400 })
+      }
+      isVerified = true
     }
-    isVerified = true
   }
 
   if (body.type === 'discord_dm') {

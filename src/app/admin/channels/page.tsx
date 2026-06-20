@@ -55,8 +55,9 @@ export default function AdminChannelsPage() {
   const [formWebhookUrl, setFormWebhookUrl] = useState("")
   const [formEmail, setFormEmail] = useState("")
   const [formDiscordUserId, setFormDiscordUserId] = useState("")
-  // "member" = membre concerné par l'événement (auto), "fixed" = ID précis
-  const [formDmRecipient, setFormDmRecipient] = useState("member")
+  // Destinataire — partagé par le MP Discord ET l'Email :
+  // "member" = membre concerné par l'événement (résolu à l'envoi), "fixed" = adresse/ID précis.
+  const [formRecipient, setFormRecipient] = useState("member")
 
   const isEditing = !!editingChannel
 
@@ -83,7 +84,7 @@ export default function AdminChannelsPage() {
     setFormWebhookUrl("")
     setFormEmail("")
     setFormDiscordUserId("")
-    setFormDmRecipient("member")
+    setFormRecipient("member")
   }
 
   const openCreate = () => {
@@ -98,7 +99,8 @@ export default function AdminChannelsPage() {
     setFormWebhookUrl(channel.type === "discord_webhook" ? (channel.config.webhook_url as string) || "" : "")
     setFormEmail(channel.type === "email" ? (channel.config.email as string) || "" : "")
     setFormDiscordUserId(channel.type === "discord_dm" ? (channel.config.discord_user_id as string) || "" : "")
-    setFormDmRecipient(channel.type === "discord_dm" && channel.config.recipient === "member" ? "member" : channel.type === "discord_dm" ? "fixed" : "member")
+    // MP Discord ET Email partagent le mode "membre concerné" / "adresse fixe".
+    setFormRecipient(channel.config.recipient === "member" ? "member" : "fixed")
     setDialogOpen(true)
   }
 
@@ -109,8 +111,8 @@ export default function AdminChannelsPage() {
       const config: Record<string, unknown> =
         formType === "discord_webhook" ? { webhook_url: formWebhookUrl }
         : formType === "discord_dm"
-          ? (formDmRecipient === "member" ? { recipient: "member" } : { discord_user_id: formDiscordUserId.trim() })
-        : { email: formEmail }
+          ? (formRecipient === "member" ? { recipient: "member" } : { discord_user_id: formDiscordUserId.trim() })
+        : (formRecipient === "member" ? { recipient: "member" } : { email: formEmail })
 
       const url = isEditing ? `/api/admin/channels/${editingChannel.id}` : "/api/admin/channels"
       const method = isEditing ? "PUT" : "POST"
@@ -194,21 +196,26 @@ export default function AdminChannelsPage() {
     if (channel.type === "discord_dm") {
       return channel.config.recipient === "member" ? "Membre concerné par l'événement" : `ID ${channel.config.discord_user_id || ""}`
     }
-    if (channel.type === "email") return channel.config.email as string || ""
+    if (channel.type === "email") {
+      return channel.config.recipient === "member"
+        ? "Membre concerné par l'événement"
+        : (channel.config.email as string) || ""
+    }
     return ""
   }
 
   const labelPlaceholder =
     formType === "discord_webhook" ? "ex: #annonces"
     : formType === "discord_dm" ? "ex: MP aux joueurs"
+    : formRecipient === "member" ? "ex: Email aux joueurs"
     : "ex: Contact du club"
 
   const submitDisabled =
     saving ||
     // En édition d'un webhook, l'URL peut rester vide (= conserver l'existante).
     (formType === "discord_webhook" ? (!isEditing && !formWebhookUrl)
-      : formType === "discord_dm" ? (formDmRecipient === "fixed" && !formDiscordUserId.trim())
-      : !formEmail)
+      : formType === "discord_dm" ? (formRecipient === "fixed" && !formDiscordUserId.trim())
+      : (formRecipient === "fixed" && !formEmail))
 
   if (clubLoading || !selectedClub || loading) {
     return <div className="mx-auto max-w-[760px] space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-24" /><Skeleton className="h-24" /></div>
@@ -304,13 +311,13 @@ export default function AdminChannelsPage() {
                 </div>
 
                 {/* Option avancée : notifier toujours la même personne (capitaine, admin…). */}
-                {formDmRecipient === "fixed" ? (
+                {formRecipient === "fixed" ? (
                   <div className="space-y-1.5">
                     <label className="block text-[12.5px] font-semibold text-foreground/80">ID Discord du destinataire</label>
                     <Input placeholder="ex: 137245874929861234" value={formDiscordUserId} onChange={(e) => setFormDiscordUserId(e.target.value)} />
                     <button
                       type="button"
-                      onClick={() => { setFormDmRecipient("member"); setFormDiscordUserId("") }}
+                      onClick={() => { setFormRecipient("member"); setFormDiscordUserId("") }}
                       className="text-[11.5px] font-medium text-[color:var(--qt-copper-500)] hover:underline"
                     >
                       ← Revenir au membre concerné
@@ -319,7 +326,7 @@ export default function AdminChannelsPage() {
                 ) : !isEditing ? (
                   <button
                     type="button"
-                    onClick={() => setFormDmRecipient("fixed")}
+                    onClick={() => setFormRecipient("fixed")}
                     className="text-[11.5px] font-medium text-muted-foreground hover:text-foreground hover:underline"
                   >
                     Notifier plutôt une personne précise (ID Discord)
@@ -331,14 +338,73 @@ export default function AdminChannelsPage() {
             {/* --- Email --- */}
             {formType === "email" && (
               <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <label className="block text-[12.5px] font-semibold text-foreground/80">Nom du canal</label>
-                  <Input placeholder={labelPlaceholder} value={formLabel} onChange={(e) => setFormLabel(e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="block text-[12.5px] font-semibold text-foreground/80">Adresse email</label>
-                  <Input type="email" placeholder="contact@monclub.fr" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} />
-                </div>
+                {/* Destinataire : au membre concerné (comme le MP) ou adresse fixe */}
+                {!isEditing && (
+                  <div className="flex gap-2">
+                    {[
+                      { value: "member", label: "Au membre concerné" },
+                      { value: "fixed", label: "Adresse fixe" },
+                    ].map((m) => {
+                      const active = formRecipient === m.value
+                      return (
+                        <button
+                          key={m.value}
+                          type="button"
+                          onClick={() => setFormRecipient(m.value)}
+                          className={`flex flex-1 items-center justify-center gap-2 rounded-lg border px-2 py-2 text-[12.5px] font-semibold transition-colors ${
+                            active
+                              ? "border-[color:var(--qt-copper-500)] bg-[color:var(--qt-copper-500)]/[0.08] text-foreground"
+                              : "border-[color:var(--qt-sable-300,#DAD4C6)] text-muted-foreground hover:bg-secondary/50"
+                          }`}
+                        >
+                          <span className="h-2.5 w-2.5 rounded-sm" style={{ background: "#C05B2E" }} />
+                          {m.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {formRecipient === "member" ? (
+                  <>
+                    <p className="text-[13px] leading-relaxed text-muted-foreground">
+                      L&apos;email part à <strong className="font-semibold text-foreground">chaque joueur concerné</strong> par
+                      l&apos;événement, à sa propre adresse. Rien à saisir : le hub la résout à l&apos;envoi, comme le MP Discord.
+                    </p>
+                    <div className="space-y-1.5">
+                      <label className="block text-[12.5px] font-semibold text-foreground/80">Nom du canal</label>
+                      <Input placeholder={labelPlaceholder} value={formLabel} onChange={(e) => setFormLabel(e.target.value)} />
+                    </div>
+                    <div className="rounded-lg border border-[color:var(--qt-sable-300,#DAD4C6)] bg-secondary/40 px-3 py-2.5 text-[11.5px] leading-relaxed text-muted-foreground">
+                      <strong className="font-semibold text-foreground/80">Conseil :</strong> avant de router vers les membres,
+                      créez d&apos;abord un canal <span className="font-semibold">« Adresse fixe »</span> vers votre propre email
+                      pour vérifier la réception réelle (mise en page, arrivée en boîte de réception).
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-1.5">
+                      <label className="block text-[12.5px] font-semibold text-foreground/80">Nom du canal</label>
+                      <Input placeholder={labelPlaceholder} value={formLabel} onChange={(e) => setFormLabel(e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-[12.5px] font-semibold text-foreground/80">Adresse email</label>
+                      <Input type="email" placeholder="contact@monclub.fr" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} />
+                      <p className="text-[11.5px] leading-relaxed text-muted-foreground">
+                        Une adresse unique : le contact du club, ou la vôtre pour tester la réception réelle avant de router vers les membres.
+                      </p>
+                    </div>
+                    {!isEditing && (
+                      <button
+                        type="button"
+                        onClick={() => { setFormRecipient("member"); setFormEmail("") }}
+                        className="text-[11.5px] font-medium text-[color:var(--qt-copper-500)] hover:underline"
+                      >
+                        ← Revenir au membre concerné
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
             )}
           </div>

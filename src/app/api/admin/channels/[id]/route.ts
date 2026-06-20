@@ -62,11 +62,16 @@ export async function PUT(
     }
 
     if (channel?.type === 'email') {
-      const email = body.config.email as string
-      if (!email || !email.includes('@')) {
-        return NextResponse.json({ error: 'Adresse email invalide' }, { status: 400 })
+      if (body.config.recipient === 'member') {
+        updates.config = { recipient: 'member' }
+        updates.is_verified = true
+      } else {
+        const email = body.config.email as string
+        if (!email || !email.includes('@')) {
+          return NextResponse.json({ error: 'Adresse email invalide' }, { status: 400 })
+        }
+        updates.is_verified = true
       }
-      updates.is_verified = true
     }
 
     if (channel?.type === 'discord_dm') {

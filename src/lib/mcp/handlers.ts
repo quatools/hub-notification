@@ -10,6 +10,7 @@ import { getDispatcher } from '@/lib/dispatchers'
 import { verifyDiscordUser } from '@/lib/dispatchers/discord-dm'
 import { getSenderIdentity } from '@/lib/notifications/sender'
 import { resolveDiscordUserId } from '@/lib/notifications/discord-recipient'
+import { resolveUserEmail } from '@/lib/notifications/email-recipient'
 import { logExecution } from '@/lib/notifications/log-execution'
 import {
   createTemDomain,
@@ -98,7 +99,9 @@ export async function listChannels(orgId: string): Promise<McpResult> {
       label: c.label,
       destination:
         c.type === 'email'
-          ? (c.config as { email?: string }).email
+          ? ((c.config as { recipient?: string }).recipient === 'member'
+              ? 'membre concerné par l\'événement'
+              : (c.config as { email?: string }).email)
           : c.type === 'discord_dm'
             ? ((c.config as { recipient?: string }).recipient === 'member'
                 ? 'membre concerné par l\'événement'
@@ -144,6 +147,10 @@ async function verifyChannelConfig(
     return { config: { webhook_url: webhookUrl }, isVerified }
   }
   if (type === 'email') {
+    // Mode "membre concerné" : pas d'adresse, résolue à l'envoi (comme discord_dm).
+    if (recipient === 'member') {
+      return { config: { recipient: 'member' }, isVerified: true }
+    }
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return { error: 'Adresse email invalide' }
     }
@@ -453,6 +460,13 @@ export async function testWorkflow(orgId: string, userId: string, args: Args): P
     const discordId = await resolveDiscordUserId(userId)
     if (!discordId) return fail('Aucun compte Discord lié à votre profil pour recevoir le test')
     config = { ...channel.config, discord_user_id: discordId }
+  }
+
+  // Canal email "membre concerné" : sans override, le test part à l'email de l'admin
+  if (channel.type === 'email' && channel.config?.recipient === 'member' && !overrideEmail) {
+    const email = await resolveUserEmail(userId)
+    if (!email) return fail('Aucune adresse email liée à votre profil pour recevoir le test')
+    config = { ...channel.config, email }
   }
 
   const dispatcher = getDispatcher(channel.type)
