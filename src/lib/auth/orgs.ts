@@ -50,7 +50,8 @@ export async function listAdminOrgs(userId: string): Promise<OrgRef[]> {
   const { data: clubs } = await supabase.rpc('get_user_clubs', { user_uuid: userId })
   for (const c of (clubs as OrgRef[] | null) || []) byId.set(c.club_id, c)
 
-  // Hub
+  // Hub : org_admins — l'org_id peut être un CLUB (public.clubs) OU une org hub
+  // (notifications.organizations) → on résout via getOrgsByIds (les deux sources).
   const { data: links } = await supabase
     .schema('notifications')
     .from('org_admins')
@@ -59,15 +60,10 @@ export async function listAdminOrgs(userId: string): Promise<OrgRef[]> {
   const linkRows = (links as { org_id: string; role: string }[] | null) || []
   if (linkRows.length > 0) {
     const roleByOrg = new Map(linkRows.map((l) => [l.org_id, l.role]))
-    const { data: orgs } = await supabase
-      .schema('notifications')
-      .from('organizations')
-      .select('id, name, slug')
-      .in('id', linkRows.map((l) => l.org_id))
-    for (const o of (orgs as { id: string; name: string; slug: string | null }[] | null) || []) {
-      if (!byId.has(o.id)) {
-        byId.set(o.id, { club_id: o.id, club_name: o.name, club_slug: o.slug, role: roleByOrg.get(o.id) || 'admin' })
-      }
+    const missing = linkRows.map((l) => l.org_id).filter((id) => !byId.has(id))
+    const resolved = await getOrgsByIds(missing)
+    for (const o of resolved) {
+      byId.set(o.club_id, { ...o, role: roleByOrg.get(o.club_id) || 'admin' })
     }
   }
 
