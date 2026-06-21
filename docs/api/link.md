@@ -40,11 +40,43 @@ Charge utile typique :
 | `discord_id`, `email`, `name` | Coordonnées connues (optionnelles). |
 | `exp` | Expiration courte. |
 
-::: tip Génération côté app
-Générez le jeton **côté serveur** de votre app (jamais côté client), avec la
-même clé API que celle utilisée pour `emit`. Le hub recalcule la signature avec
-cette clé pour authentifier la demande.
+::: warning Quel secret pour signer ?
+Signez avec le **`signing_secret`** de votre app self-service (**pas** la clé API,
+qui sert au `Bearer` d'`emit`). Pour une app historique (clé en environnement),
+c'est la clé API qui fait office de secret. Toujours **côté serveur**, jamais
+côté client.
 :::
+
+### Forger le jeton (Node.js)
+
+Le jeton est `base64url(payload).base64url(hmac)` :
+
+```typescript
+import { createHmac } from 'crypto'
+
+/** secret = NOTIFICATION_SIGNING_SECRET (app self-service). */
+function mintLinkToken(payload: Record<string, unknown>, secret: string): string {
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url')
+  const sig = createHmac('sha256', secret).update(body).digest('base64url')
+  return `${body}.${sig}`
+}
+
+// Rattachement membre — rediriger l'utilisateur vers le lien obtenu.
+const token = mintLinkToken(
+  {
+    app: 'storm',
+    app_user_id: 'membre-123',
+    org_id: '<org_id>',
+    email: 'jean@example.com',
+    exp: Math.floor(Date.now() / 1000) + 120, // 2 min
+  },
+  process.env.NOTIFICATION_SIGNING_SECRET!,
+)
+// → https://hub.quatools.fr/api/link?token=${token}
+```
+
+Pour un **lien admin**, ajoutez `scope: "admin"` au payload et redirigez vers
+`/api/link-admin` (voir ci-dessous).
 
 ## Paramètres de la requête
 
@@ -90,6 +122,14 @@ enregistre l'utilisateur comme **admin de l'org**. Redirection vers
 
 ::: tip Idempotent
 Ré-ouvrir le lien ne crée pas de doublon : l'utilisateur reste simplement admin.
+:::
+
+::: info Rôles & équipe
+Le **premier** admin à réclamer une org en devient **propriétaire** (`owner`) ;
+les suivants sont **`admin`**. Le propriétaire peut ensuite **inviter, promouvoir
+ou retirer** des membres depuis le hub (page **Équipe**) — vous n'avez rien à
+implémenter côté app pour ça. Ces droits sont **propres au hub** (gérer les
+notifications), distincts des droits de votre propre plateforme.
 :::
 
 ## Page de rattachement (à venir)
