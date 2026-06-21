@@ -94,14 +94,23 @@ export async function createApp(
   const app = data as AppRow
   // Alerte opérateur (dogfood) — non bloquant : prévenir qu'une app vient d'être
   // créée et attend une validation. Via l'app système hub-notification.
+  // On fournit le CRÉATEUR comme destinataire → permet un mail de bienvenue
+  // via un canal « membre concerné ».
   let owner_email = ''
+  let owner_name = ''
   try {
     const { data: u } = await sb.auth.admin.getUserById(userId)
     owner_email = u?.user?.email || ''
+    const m = (u?.user?.user_metadata || {}) as Record<string, string>
+    owner_name = m.full_name || m.name || ''
   } catch {
-    // ignore : email non résolu
+    // ignore : créateur non résolu
   }
-  notifyOperator('hub.app.created', { app_name: app.name, slug: app.slug, owner_email }).catch(() => {})
+  notifyOperator(
+    'hub.app.created',
+    { app_name: app.name, slug: app.slug, owner_email, owner_name },
+    [{ app_user_id: userId, email: owner_email, name: owner_name }]
+  ).catch(() => {})
   return { app }
 }
 

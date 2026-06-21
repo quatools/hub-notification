@@ -12,7 +12,18 @@
  * No-op si non configuré. Toujours non bloquant : une alerte ratée ne doit
  * JAMAIS casser l'action métier (création d'app, etc.).
  */
-export async function notifyOperator(event: string, payload: Record<string, unknown>): Promise<void> {
+export interface SelfRecipient {
+  app_user_id?: string
+  email?: string
+  discord_id?: string
+  name?: string
+}
+
+export async function notifyOperator(
+  event: string,
+  payload: Record<string, unknown>,
+  recipients?: SelfRecipient[]
+): Promise<void> {
   const key = process.env.HUB_SELF_API_KEY
   const orgId = process.env.HUB_SELF_ORG_ID
   const base = process.env.HUB_SELF_URL
@@ -22,7 +33,9 @@ export async function notifyOperator(event: string, payload: Record<string, unkn
     await fetch(`${base.replace(/\/$/, '')}/api/notifications/emit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ event, org_id: orgId, payload }),
+      // `recipients` permet aux canaux « membre concerné » (ex. mail de bienvenue
+      // au créateur de l'app) de résoudre le destinataire.
+      body: JSON.stringify({ event, org_id: orgId, payload, recipients }),
       signal: AbortSignal.timeout(5000),
     })
   } catch {
