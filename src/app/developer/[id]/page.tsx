@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -59,6 +59,7 @@ function CopyBtn({ value }: { value: string }) {
 
 export default function AppDetailPage() {
   const params = useParams<{ id: string }>()
+  const router = useRouter()
   const id = params.id
   const [app, setApp] = useState<App | null>(null)
   const [keys, setKeys] = useState<ApiKey[]>([])
@@ -115,6 +116,17 @@ export default function AppDetailPage() {
       toast.success("Clé révoquée")
     } catch {
       toast.error("Erreur lors de la révocation")
+    }
+  }
+
+  const remove = async () => {
+    try {
+      const res = await fetch(`/api/developer/apps/${id}`, { method: "DELETE" })
+      if (!res.ok) throw new Error()
+      toast.success("Application supprimée")
+      router.push("/developer")
+    } catch {
+      toast.error("Erreur lors de la suppression")
     }
   }
 
@@ -267,6 +279,37 @@ export default function AppDetailPage() {
             </a>
           </p>
         </div>
+      </div>
+
+      {/* Zone de danger : suppression */}
+      <div className="mt-8 rounded-2xl border border-[#E4B4A8] bg-[#FBF1ED] p-5">
+        <h2 className="text-sm font-semibold text-[#B5402F]">Supprimer l&apos;application</h2>
+        <p className="mt-1 text-[13px] text-muted-foreground">
+          Supprime définitivement <strong>{app.name}</strong>, ses clés et son secret de signature.
+          Toute intégration qui l&apos;utilise cessera de fonctionner. Action irréversible.
+        </p>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="ghost" className="mt-3 text-[#B5402F] hover:text-[#B5402F]">
+              <Trash2 className="mr-2 h-4 w-4" />Supprimer l&apos;application
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Supprimer « {app.name} » ?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Action <strong>irréversible</strong> : les clés et le secret de signature seront perdus,
+                et toute intégration utilisant cette app cessera de fonctionner.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuler</AlertDialogCancel>
+              <AlertDialogAction onClick={remove} className="bg-[#B5402F] hover:bg-[#9a3527]">
+                Supprimer définitivement
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       {/* Secret affiché une seule fois */}
