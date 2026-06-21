@@ -6,6 +6,7 @@
  */
 
 import { createServiceClient } from '@/lib/supabase/server'
+import { resolveOrgApp } from '@/lib/auth/orgs'
 import { getDispatcher } from '@/lib/dispatchers'
 import { verifyDiscordUser } from '@/lib/dispatchers/discord-dm'
 import { getSenderIdentity } from '@/lib/notifications/sender'
@@ -40,10 +41,12 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim
 
 export async function listEvents(orgId: string, args: Args): Promise<McpResult> {
   const supabase = createServiceClient()
+  const orgApp = await resolveOrgApp(orgId)
   let query = supabase
     .schema('notifications')
     .from('events')
     .select('id, app, slug, label, description, category, supported_channels, audiences, payload_schema')
+    .eq('app', orgApp)
     .eq('is_active', true)
     .is('deprecated_at', null)
     .order('category')
@@ -295,11 +298,13 @@ export async function createWorkflow(orgId: string, userId: string, args: Args):
   }
 
   const supabase = createServiceClient()
+  const orgApp = await resolveOrgApp(orgId)
 
   const { data: event } = await supabase
     .schema('notifications')
     .from('events')
     .select('id, slug, supported_channels')
+    .eq('app', orgApp)
     .eq('slug', eventSlug)
     .eq('is_active', true)
     .single()

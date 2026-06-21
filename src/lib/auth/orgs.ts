@@ -95,3 +95,18 @@ export async function getOrgsByIds(ids: string[]): Promise<OrgRef[]> {
 
   return Array.from(out.values())
 }
+
+/**
+ * App propriétaire d'une org, pour cloisonner ses événements :
+ * `organizations.app` (orgs hub : Storm…) sinon `'baas-esport'` (clubs BAAS).
+ */
+export async function resolveOrgApp(orgId: string): Promise<string> {
+  const supabase = createServiceClient()
+  const { data } = await supabase
+    .schema('notifications')
+    .from('organizations')
+    .select('app')
+    .eq('id', orgId)
+    .maybeSingle()
+  return (data?.app as string | undefined) || 'baas-esport'
+}

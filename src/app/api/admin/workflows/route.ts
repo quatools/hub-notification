@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminAuth } from '@/lib/auth/admin'
 import { createServiceClient } from '@/lib/supabase/server'
+import { resolveOrgApp } from '@/lib/auth/orgs'
 // GET /api/admin/workflows?org_id=xxx
 export async function GET(request: NextRequest) {
   const orgId = request.nextUrl.searchParams.get('org_id')
@@ -54,11 +55,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Erreur lors du chargement des workflows' }, { status: 500 })
   }
 
-  // Charger tous les events disponibles
+  // N'exposer que les événements de l'APP propriétaire de l'org (cloisonnement inter-app).
+  const orgApp = await resolveOrgApp(auth.org_id)
   const { data: allEvents } = await supabase
     .schema('notifications')
     .from('events')
     .select('*')
+    .eq('app', orgApp)
     .eq('is_active', true)
     .is('deprecated_at', null)
     .order('category')

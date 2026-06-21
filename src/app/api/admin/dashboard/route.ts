@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminAuth } from '@/lib/auth/admin'
 import { createServiceClient } from '@/lib/supabase/server'
+import { resolveOrgApp } from '@/lib/auth/orgs'
 
 // Couleur de pastille par catégorie d'événement (charte Quatools)
 const CAT_COLOR: Record<string, string> = {
@@ -34,12 +35,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
   }
 
+  const orgApp = await resolveOrgApp(auth.org_id)
   const sb = createServiceClient().schema('notifications')
 
-  // Workflows de l'org + events du catalogue
+  // Workflows de l'org + events du catalogue (cloisonnés par l'app de l'org)
   const [{ data: wfs }, { data: events }] = await Promise.all([
     sb.from('workflows').select('id, event_id, is_active').eq('org_id', orgId),
-    sb.from('events').select('id, slug, label, category').eq('is_active', true).is('deprecated_at', null),
+    sb.from('events').select('id, slug, label, category').eq('app', orgApp).eq('is_active', true).is('deprecated_at', null),
   ])
 
   const activeWfs = (wfs || []).filter((w) => w.is_active)
