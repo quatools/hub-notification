@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
-import { LogOut, Shield, User, Check, Zap, Settings, Code, Users } from "lucide-react"
+import { LogOut, Shield, User, Check, Zap, Settings, Code, Users, ShieldAlert } from "lucide-react"
 
 /** Avatar + menu compte : bascule d'espace (admin / membre) et déconnexion. */
 export function AccountMenu() {
@@ -16,6 +16,7 @@ export function AccountMenu() {
   const [email, setEmail] = useState<string | null>(null)
   const [avatar, setAvatar] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
+  const [isOperator, setIsOperator] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -28,6 +29,13 @@ export function AccountMenu() {
       setAvatar(m.avatar_url || m.picture || null)
     })
   }, [supabase])
+
+  useEffect(() => {
+    fetch("/api/operator/me")
+      .then((r) => r.json())
+      .then((d) => setIsOperator(!!d.is_operator))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -140,6 +148,14 @@ export function AccountMenu() {
               </Link>
               <Link href="/admin/settings" onClick={() => setOpen(false)} className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] hover:bg-secondary">
                 <Settings className="h-4 w-4 text-muted-foreground" />Paramètres
+              </Link>
+            </div>
+          )}
+
+          {isOperator && (
+            <div className="mt-1.5 border-t pt-1.5">
+              <Link href="/operator" onClick={() => setOpen(false)} className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] hover:bg-secondary">
+                <ShieldAlert className="h-4 w-4 text-[color:var(--qt-copper-500)]" />Console opérateur
               </Link>
             </div>
           )}
