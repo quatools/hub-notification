@@ -8,6 +8,7 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { resolveOrgApp } from '@/lib/auth/orgs'
 import { getDispatcher } from '@/lib/dispatchers'
+import { renderTemplate } from '@/lib/notifications/templates'
 import { verifyDiscordUser } from '@/lib/dispatchers/discord-dm'
 import { getSenderIdentity } from '@/lib/notifications/sender'
 import { resolveDiscordUserId } from '@/lib/notifications/discord-recipient'
@@ -497,6 +498,15 @@ export async function testWorkflow(orgId: string, userId: string, args: Args): P
     sender,
   })
 
+  // Aperçu « message exact » pour l'historique, comme l'emit réel.
+  const renderedContent = {
+    subject: step.subject ? renderTemplate(step.subject, payload) : null,
+    body: step.body ? renderTemplate(step.body, payload) : '',
+    format: step.format || 'text',
+    channel_type: channel.type,
+  }
+  const destination = overrideEmail || config?.email || config?.discord_user_id || channel.label || null
+
   await logExecution({
     workflowId,
     eventSlug: event.slug,
@@ -507,6 +517,8 @@ export async function testWorkflow(orgId: string, userId: string, args: Args): P
     success: result.success,
     error: result.error,
     isTest: true,
+    renderedContent,
+    destination,
   })
 
   if (!result.success) return fail(`Échec de l'envoi: ${result.error}`)

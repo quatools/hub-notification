@@ -6,6 +6,7 @@ import { getSenderIdentity } from '@/lib/notifications/sender'
 import { resolveDiscordUserId } from '@/lib/notifications/discord-recipient'
 import { resolveUserEmail } from '@/lib/notifications/email-recipient'
 import { logExecution } from '@/lib/notifications/log-execution'
+import { renderTemplate } from '@/lib/notifications/templates'
 import type { NotificationEvent } from '@/lib/types/notifications'
 
 /**
@@ -147,18 +148,29 @@ export async function POST(
 
   const sender = await getSenderIdentity(workflow.org_id)
 
+  // Étape effective (contenu en cours d'édition éventuel)
+  const effSubject = options.step?.subject !== undefined ? options.step.subject : step.subject
+  const effBody = options.step?.body || step.body
+  const effFormat = (options.step?.format || step.format) as 'text' | 'html' | 'markdown'
+
   // L'admin peut tester le contenu en cours d'édition (non sauvegardé)
   const result = await dispatcher({
     config,
     event,
     payload: testPayload,
-    step: {
-      subject: options.step?.subject !== undefined ? options.step.subject : step.subject,
-      body: options.step?.body || step.body,
-      format: (options.step?.format || step.format) as 'text' | 'html' | 'markdown',
-    },
+    step: { subject: effSubject, body: effBody, format: effFormat },
     sender,
   })
+
+  // Aperçu « message exact » pour l'historique (comme l'emit réel).
+  const renderedContent = {
+    subject: effSubject ? renderTemplate(effSubject, testPayload) : null,
+    body: effBody ? renderTemplate(effBody, testPayload) : '',
+    format: effFormat || 'text',
+    channel_type: channel.type,
+  }
+  const cfg = config as { email?: string; discord_user_id?: string } | undefined
+  const destination = options.override_email || cfg?.email || cfg?.discord_user_id || channel.label || null
 
   await logExecution({
     workflowId: id,
@@ -170,6 +182,8 @@ export async function POST(
     success: result.success,
     error: result.error,
     isTest: true,
+    renderedContent,
+    destination,
   })
 
   return NextResponse.json({
