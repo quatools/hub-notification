@@ -5,6 +5,7 @@
  */
 import { createHash, randomBytes } from 'crypto'
 import { createServiceClient } from '@/lib/supabase/server'
+import { notifyOperator } from '@/lib/notifications/hub-self'
 
 const MAX_APPS_PER_USER = 5
 const SLUG_RE = /^[a-z][a-z0-9-]{1,38}$/
@@ -90,7 +91,18 @@ export async function createApp(
     console.error('Erreur création app:', error)
     return { error: "Erreur lors de la création de l'application" }
   }
-  return { app: data as AppRow }
+  const app = data as AppRow
+  // Alerte opérateur (dogfood) — non bloquant : prévenir qu'une app vient d'être
+  // créée et attend une validation. Via l'app système hub-notification.
+  let owner_email = ''
+  try {
+    const { data: u } = await sb.auth.admin.getUserById(userId)
+    owner_email = u?.user?.email || ''
+  } catch {
+    // ignore : email non résolu
+  }
+  notifyOperator('hub.app.created', { app_name: app.name, slug: app.slug, owner_email }).catch(() => {})
+  return { app }
 }
 
 export async function deleteApp(userId: string, appId: string): Promise<boolean> {
