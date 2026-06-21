@@ -27,10 +27,11 @@ l'intégration). Une fois votre intégration prête, l'opérateur la passe en «
 après une revue rapide de ce qu'elle envoie.
 :::
 
-## Déclarer son organisation (applications tierces)
+## Déclarer son organisation
 
-Si vos organisations **ne sont pas** des clubs esport du BAAS, déclarez-les
-d'abord pour obtenir un `org_id` :
+Une **organisation** est l'un de vos espaces (un club, une équipe, un tenant…) :
+elle porte ses propres destinataires et sa configuration (canaux, workflows).
+Déclarez chacune pour obtenir son `org_id` :
 
 ```http
 POST /api/notifications/orgs
@@ -41,15 +42,10 @@ Content-Type: application/json
 ```
 
 Réponse : `{ "org_id": "…", "created": true }`. Stockez l'`org_id` (idempotent
-par `external_id`), il sert pour tout le reste. Pour donner les droits à un
-administrateur humain, utilisez le
+par `external_id`), il sert pour tout le reste — `emit`, workflows, droits admin.
+Pour donner les droits à un administrateur humain, utilisez le
 [lien admin](/api/link#lien-admin-octroi-de-droits). Détails :
 [`/orgs`](/api/orgs).
-
-::: info BAAS esport ?
-Si vous émettez au nom de clubs existants, sautez cette étape : votre `org_id`
-est l'id du club.
-:::
 
 ## 1. Déclarer ses événements
 

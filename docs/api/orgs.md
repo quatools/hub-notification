@@ -1,17 +1,10 @@
 # Déclarer une organisation (`/api/notifications/orgs`)
 
-Par défaut, le hub emprunte la notion d'« organisation » au BAAS esport (les
-clubs). Une **application tierce** dont les organisations ne sont **pas** des
-clubs déclare ses propres organisations via cet endpoint : le hub crée une
-organisation **qu'il possède** et renvoie son `org_id` (UUID), que l'app utilise
-ensuite dans ses [`emit`](/api/emit).
-
-::: info Quand l'utiliser
-- **Vous êtes le BAAS esport** (ou partagez ses clubs) → inutile : votre `org_id`
-  est l'id du club existant.
-- **Vous êtes une app tierce** (ex. Storm) avec vos propres organisations →
-  déclarez-les ici pour obtenir un `org_id` hub.
-:::
+Une **organisation** est l'espace auquel se rattachent vos destinataires et votre
+configuration (canaux, workflows) — un club, une équipe, un tenant… Déclarez
+chacune des vôtres via cet endpoint : le hub crée une organisation **qu'il
+possède** et renvoie son `org_id` (UUID), que vous utilisez ensuite dans vos
+[`emit`](/api/emit). C'est **idempotent** par `external_id` (voir [plus bas](#idempotence)).
 
 ## Requête
 
