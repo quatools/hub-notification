@@ -376,11 +376,22 @@ export async function updateWorkflow(orgId: string, args: Args): Promise<McpResu
 
   const supabase = createServiceClient()
 
-  if (typeof args.is_active === 'boolean') {
+  // Modifs sur le workflow lui-même : activation et/ou canal de destination.
+  const wfUpdates: Record<string, unknown> = {}
+  if (typeof args.is_active === 'boolean') wfUpdates.is_active = args.is_active
+
+  const newChannelId = str(args.channel_id)
+  if (newChannelId) {
+    const channel = await getOrgChannel(orgId, newChannelId)
+    if (!channel) return fail('Canal introuvable dans cette organisation')
+    wfUpdates.channel_id = newChannelId
+  }
+
+  if (Object.keys(wfUpdates).length > 0) {
     const { error } = await supabase
       .schema('notifications')
       .from('workflows')
-      .update({ is_active: args.is_active })
+      .update(wfUpdates)
       .eq('id', workflowId)
     if (error) return fail(error.message)
   }

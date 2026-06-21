@@ -110,11 +110,12 @@ export const hubTools: McpTool[] = [
   },
   {
     name: 'update_workflow',
-    description: "Modifie le message d'un workflow (sujet, corps, format) ou son activation.",
+    description: "Modifie un workflow : son canal de destination (channel_id), le message (sujet, corps, format) ou son activation.",
     inputSchema: {
       type: 'object',
       properties: {
         workflow_id: { type: 'string', description: 'ID du workflow' },
+        channel_id: { type: 'string', description: 'Nouveau canal de destination (voir list_channels)' },
         subject: { type: 'string' },
         body: { type: 'string' },
         format: { type: 'string', enum: ['text', 'markdown', 'html'] },
