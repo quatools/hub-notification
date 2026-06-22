@@ -81,8 +81,6 @@ export async function POST() {
     })
   }
 
-  console.error('[channels/sync]', JSON.stringify({ userId: user.id, providers: identities.map((i) => i.provider), discordId, existing: have.size, toAdd: toAdd.length }))
-
   if (toAdd.length > 0) {
     const { error: insErr } = await sb.schema('notifications').from('channels').insert(toAdd)
     if (insErr) console.error('[channels/sync] insert error', insErr)
