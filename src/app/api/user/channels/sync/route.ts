@@ -35,13 +35,20 @@ export async function POST() {
     have.add(`${c.type}:${String(v).toLowerCase()}`)
   }
 
-  // Identités liées (emails vérifiés par le provider).
-  const { data: u } = await sb.auth.admin.getUserById(user.id)
-  const identities = (u?.user?.identities || []) as Array<{ provider: string; identity_data?: Record<string, unknown> }>
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const toAdd: any[] = []
   const seen = new Set<string>()
+
+  // Identités liées (emails vérifiés par le provider). Un échec ici ne doit PAS
+  // bloquer la dérivation du canal Discord ci-dessous.
+  let identities: Array<{ provider: string; identity_data?: Record<string, unknown> }> = []
+  try {
+    const { data: u, error: uErr } = await sb.auth.admin.getUserById(user.id)
+    if (uErr) console.error('[channels/sync] getUserById error', uErr)
+    identities = (u?.user?.identities || []) as typeof identities
+  } catch (e) {
+    console.error('[channels/sync] getUserById threw', e)
+  }
 
   for (const id of identities) {
     const email = id.identity_data?.email as string | undefined
@@ -74,8 +81,11 @@ export async function POST() {
     })
   }
 
+  console.error('[channels/sync]', JSON.stringify({ userId: user.id, providers: identities.map((i) => i.provider), discordId, existing: have.size, toAdd: toAdd.length }))
+
   if (toAdd.length > 0) {
-    await sb.schema('notifications').from('channels').insert(toAdd)
+    const { error: insErr } = await sb.schema('notifications').from('channels').insert(toAdd)
+    if (insErr) console.error('[channels/sync] insert error', insErr)
   }
 
   return NextResponse.json({ added: toAdd.length })
