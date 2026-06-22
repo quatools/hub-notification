@@ -220,7 +220,10 @@ export default function AdminDashboardPage() {
       {/* Désabonnements · feedback membre (data du club) */}
       {data?.unsubscribes && data.unsubscribes.length > 0 && (
         <div className="space-y-3">
-          <div className="mono-label">Désabonnements · pourquoi vos membres partent</div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="mono-label">Désabonnements · pourquoi vos membres partent</div>
+            <Link href="/admin/unsubscribes" className="shrink-0 text-xs font-semibold text-[color:var(--qt-copper-500)] hover:underline">Voir qui →</Link>
+          </div>
           <Card>
             <CardContent className="px-4 py-1">
               {data.unsubscribes.map((u, i) => {
