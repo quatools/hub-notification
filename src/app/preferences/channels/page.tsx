@@ -2,85 +2,72 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+} from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { useClub } from "@/lib/contexts/club-context"
+import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
-import { Plus, Trash2, Loader2, LogIn } from "lucide-react"
+import { Plus, Trash2, LogIn, Mail, MessageSquare, ShieldCheck } from "lucide-react"
 
 interface UserChannel {
   id: string
   type: string
   label: string | null
   config: Record<string, unknown>
-  created_at: string
+  is_verified?: boolean
 }
 
 const SOON = ["SMS", "WhatsApp", "Slack", "Telegram", "Notification push", "Webhook"]
+const PROVIDERS = [
+  { id: "discord", label: "Discord" },
+  { id: "google", label: "Google" },
+  { id: "github", label: "GitHub" },
+] as const
 
-function vignetteForChannel(channel: UserChannel): { bg: string; initial: string } {
-  const email = (channel.config.email as string | undefined) || ""
-  if (channel.type === "email") {
-    return { bg: "#24405E", initial: email ? "@" : "@" }
+function channelView(c: UserChannel): { Icon: typeof Mail; primary: string; secondary: string } {
+  if (c.type === "discord_dm") {
+    return { Icon: MessageSquare, primary: c.label || "Discord", secondary: "Message privé Discord" }
   }
-  const source = channel.label || email
-  return { bg: "#24405E", initial: (source.charAt(0) || "?").toUpperCase() }
+  return { Icon: Mail, primary: c.label || "Email", secondary: (c.config.email as string) || "" }
 }
 
 function UserChannelsContent() {
   const { loading: clubLoading, isAuthenticated } = useClub()
+  const supabase = createClient()
   const [channels, setChannels] = useState<UserChannel[]>([])
   const [loading, setLoading] = useState(true)
-  const [createOpen, setCreateOpen] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const [newLabel, setNewLabel] = useState("")
-  const [newEmail, setNewEmail] = useState("")
 
-  const fetchChannels = useCallback(async () => {
+  const load = useCallback(async () => {
     try {
+      // Synchronise les canaux depuis les identités PROUVÉES (Discord/Google/GitHub).
+      await fetch("/api/user/channels/sync", { method: "POST" }).catch(() => {})
       const res = await fetch("/api/user/channels")
       if (!res.ok) throw new Error()
-      const data = await res.json()
-      setChannels(data.channels || [])
+      setChannels((await res.json()).channels || [])
     } catch {
-      toast.error("Erreur lors du chargement des canaux")
+      toast.error("Erreur lors du chargement des comptes")
     } finally {
       setLoading(false)
     }
   }, [])
 
-  useEffect(() => { fetchChannels() }, [fetchChannels])
+  useEffect(() => {
+    load()
+  }, [load])
 
-  const handleCreate = async () => {
-    if (!newEmail) return
-    setCreating(true)
-    try {
-      const res = await fetch("/api/user/channels", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "email",
-          label: newLabel || undefined,
-          config: { email: newEmail },
-        }),
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        toast.error(err.error || "Erreur lors de la création")
-        return
-      }
-      toast.success("Canal ajouté")
-      setCreateOpen(false)
-      setNewLabel("")
-      setNewEmail("")
-      fetchChannels()
-    } catch {
-      toast.error("Erreur lors de la création")
-    } finally {
-      setCreating(false)
+  const connect = async (provider: (typeof PROVIDERS)[number]["id"]) => {
+    const { error } = await supabase.auth.linkIdentity({
+      provider,
+      options: { redirectTo: typeof window !== "undefined" ? window.location.href : undefined },
+    })
+    if (error) {
+      toast.error(error.message || "Connexion impossible — ce compte est peut-être déjà lié à un autre profil.")
     }
   }
 
@@ -89,7 +76,7 @@ function UserChannelsContent() {
       const res = await fetch(`/api/user/channels/${channelId}`, { method: "DELETE" })
       if (!res.ok) throw new Error()
       setChannels((prev) => prev.filter((c) => c.id !== channelId))
-      toast.success("Canal supprimé")
+      toast.success("Canal retiré")
     } catch {
       toast.error("Erreur lors de la suppression")
     }
@@ -110,95 +97,54 @@ function UserChannelsContent() {
   }
 
   if (loading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-24" />
-      </div>
-    )
+    return <div className="space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-24" /></div>
   }
 
   return (
     <div className="max-w-[720px] mx-auto py-8">
       <div className="flex items-start justify-between gap-4">
         <h1 className="font-serif text-[26px] font-medium">Mes comptes</h1>
-        <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) { setNewLabel(""); setNewEmail("") } }}>
-          <DialogTrigger asChild>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <Button className="bg-[#24405E] text-white hover:bg-[#24405E]/90 shrink-0">
-              <Plus className="h-4 w-4 mr-2" />Ajouter un email
+              <Plus className="h-4 w-4 mr-2" />Connecter un compte
             </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Ajouter une adresse email</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Label (optionnel)</Label>
-                <Input
-                  placeholder="ex: Email perso"
-                  value={newLabel}
-                  onChange={(e) => setNewLabel(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Adresse email</Label>
-                <Input
-                  type="email"
-                  placeholder="mon.email@exemple.fr"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button variant="outline">Annuler</Button>
-              </DialogClose>
-              <Button onClick={handleCreate} disabled={creating || !newEmail} className="bg-[#24405E] text-white hover:bg-[#24405E]/90">
-                {creating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Ajouter
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {PROVIDERS.map((p) => (
+              <DropdownMenuItem key={p.id} onSelect={() => connect(p.id)}>{p.label}</DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <p className="text-sm text-muted-foreground mb-6">
-        Connectez vos comptes pour recevoir vos notifications là où vous êtes.
+        Connectez vos comptes (Discord, Google, GitHub) pour recevoir vos notifications là où vous êtes. La
+        possession est <strong>vérifiée par le service</strong> — on n&apos;envoie jamais vers une adresse non prouvée.
       </p>
 
       {channels.length === 0 ? (
-        <p className="text-sm text-muted-foreground mb-7">Aucun compte pour l&apos;instant.</p>
+        <p className="text-sm text-muted-foreground mb-7">
+          Aucun compte connecté. Cliquez « Connecter un compte » pour recevoir vos notifications par email ou Discord.
+        </p>
       ) : (
         <div className="flex flex-col gap-2.5 mb-7">
           {channels.map((channel) => {
-            const { bg, initial } = vignetteForChannel(channel)
+            const { Icon, primary, secondary } = channelView(channel)
             return (
-              <div
-                key={channel.id}
-                className="bg-white border border-[#DAD4C6] rounded-xl px-4 py-3.5 flex items-center gap-3"
-              >
-                <div
-                  className="w-[38px] h-[38px] rounded-[10px] flex items-center justify-center text-white font-bold text-sm shrink-0"
-                  style={{ background: bg }}
-                >
-                  {initial}
+              <div key={channel.id} className="bg-white border border-[#DAD4C6] rounded-xl px-4 py-3.5 flex items-center gap-3">
+                <div className="w-[38px] h-[38px] rounded-[10px] flex items-center justify-center text-white shrink-0" style={{ background: "#24405E" }}>
+                  <Icon className="h-[18px] w-[18px]" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold">{channel.label || "Email"}</div>
-                  <div className="text-xs text-muted-foreground truncate">
-                    {channel.config.email as string}
-                  </div>
+                  <div className="text-sm font-semibold">{primary}</div>
+                  <div className="text-xs text-muted-foreground truncate">{secondary}</div>
                 </div>
                 <span
-                  className="mono-label text-[10px] rounded-full px-2 py-0.5"
-                  style={{
-                    background: "color-mix(in srgb, #2F7D5B 12%, white)",
-                    color: "#2F7D5B",
-                  }}
+                  className="mono-label text-[10px] rounded-full px-2 py-0.5 inline-flex items-center gap-1"
+                  style={{ background: "color-mix(in srgb, #2F7D5B 12%, white)", color: "#2F7D5B" }}
                 >
-                  Vérifié
+                  <ShieldCheck className="h-3 w-3" />Vérifié
                 </span>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
@@ -208,16 +154,15 @@ function UserChannelsContent() {
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Supprimer ce compte ?</AlertDialogTitle>
+                      <AlertDialogTitle>Retirer ce canal ?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Vous ne recevrez plus de notifications sur cette adresse.
+                        Vous ne recevrez plus de notifications ici. Tant que le compte reste connecté, il peut
+                        réapparaître ; déconnectez le compte pour le retirer définitivement.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Annuler</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => handleDelete(channel.id)}>
-                        Supprimer
-                      </AlertDialogAction>
+                      <AlertDialogAction onClick={() => handleDelete(channel.id)}>Retirer</AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
@@ -230,10 +175,7 @@ function UserChannelsContent() {
       <div className="mono-label mb-3">Bientôt · le hub se connecte à tout</div>
       <div className="flex flex-wrap gap-2">
         {SOON.map((name) => (
-          <span
-            key={name}
-            className="inline-flex items-center gap-2 rounded-full border border-dashed border-[#DAD4C6] px-3 py-1.5 text-xs text-muted-foreground"
-          >
+          <span key={name} className="inline-flex items-center gap-2 rounded-full border border-dashed border-[#DAD4C6] px-3 py-1.5 text-xs text-muted-foreground">
             <span className="h-1.5 w-1.5 rounded-full bg-[#C9CDD6]" />
             {name}
           </span>
