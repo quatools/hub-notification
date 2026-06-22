@@ -17,6 +17,15 @@ interface DashboardData {
   success_rate: number | null
   to_configure: { label: string; color: string }[]
   activity: { text: string; color: string; time: string }[]
+  unsubscribes: { event: string; total: number; reasons: Record<string, number> }[]
+}
+
+const REASON_LABELS: Record<string, string> = {
+  trop_souvent: "Trop souvent",
+  pas_pertinent: "Pas pertinent",
+  mauvais_moment: "Mauvais moment",
+  autre_canal: "Autre canal",
+  autre: "Autre",
 }
 
 export default function AdminDashboardPage() {
@@ -205,6 +214,41 @@ export default function AdminDashboardPage() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Désabonnements · feedback membre (data du club) */}
+      {data?.unsubscribes && data.unsubscribes.length > 0 && (
+        <div className="space-y-3">
+          <div className="mono-label">Désabonnements · pourquoi vos membres partent</div>
+          <Card>
+            <CardContent className="px-4 py-1">
+              {data.unsubscribes.map((u, i) => {
+                const reasons = Object.entries(u.reasons).sort((a, b) => b[1] - a[1])
+                const noReason = u.total - reasons.reduce((s, [, c]) => s + c, 0)
+                return (
+                  <div key={i} className="py-3 border-b last:border-0">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-semibold">{u.event}</div>
+                      <div className="font-mono text-xs text-muted-foreground shrink-0">{u.total} désab.</div>
+                    </div>
+                    {(reasons.length > 0 || noReason > 0) && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {reasons.map(([r, c]) => (
+                          <span key={r} className="rounded-full bg-secondary px-2.5 py-1 text-[11.5px] text-muted-foreground">
+                            {REASON_LABELS[r] || r} · <strong className="text-foreground">{c}</strong>
+                          </span>
+                        ))}
+                        {noReason > 0 && (
+                          <span className="rounded-full px-2.5 py-1 text-[11.5px] text-muted-foreground/60">sans raison · {noReason}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </CardContent>
+          </Card>
         </div>
       )}
 

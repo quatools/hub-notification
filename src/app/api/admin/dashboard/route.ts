@@ -91,11 +91,31 @@ export async function GET(request: NextRequest) {
     return { text, color: ok ? '#2F7D5B' : '#B5402F', time: relTime(r.sent_at || r.created_at) }
   })
 
+  // Désabonnements : raisons agrégées PAR ÉVÉNEMENT (data du club, voix membre).
+  const eventLabelById = new Map(eventList.map((e) => [e.id, e.label]))
+  const wfLabel = new Map<string, string>(((wfs as { id: string; event_id: string }[] | null) || []).map((w) => [w.id, eventLabelById.get(w.event_id) || '—']))
+  const wfIds = Array.from(wfLabel.keys())
+  const unsubscribes: Array<{ event: string; total: number; reasons: Record<string, number> }> = []
+  if (wfIds.length > 0) {
+    const { data: optouts } = await sb.from('user_optouts').select('workflow_id, reason').in('workflow_id', wfIds)
+    const byEvent = new Map<string, { total: number; reasons: Record<string, number> }>()
+    for (const o of (optouts as { workflow_id: string; reason: string | null }[] | null) || []) {
+      const label = wfLabel.get(o.workflow_id) || '—'
+      let e = byEvent.get(label)
+      if (!e) { e = { total: 0, reasons: {} }; byEvent.set(label, e) }
+      e.total++
+      if (o.reason) e.reasons[o.reason] = (e.reasons[o.reason] || 0) + 1
+    }
+    for (const [event, v] of byEvent) unsubscribes.push({ event, total: v.total, reasons: v.reasons })
+    unsubscribes.sort((a, b) => b.total - a.total)
+  }
+
   return NextResponse.json({
     active_workflows: activeWfs.length,
     sent_7d: sent7d,
     success_rate: successRate,
     to_configure: toConfigure,
     activity,
+    unsubscribes,
   })
 }
