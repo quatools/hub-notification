@@ -20,6 +20,7 @@ interface OrgSettings {
   reply_to: string | null
   sender_domain: string | null
   domain_status: string
+  brand_color: string | null
 }
 
 export default function AdminSettingsPage() {
@@ -29,6 +30,7 @@ export default function AdminSettingsPage() {
   const [saving, setSaving] = useState(false)
   const [senderName, setSenderName] = useState("")
   const [replyTo, setReplyTo] = useState("")
+  const [brandColor, setBrandColor] = useState("")
 
   const fetchSettings = useCallback(async () => {
     if (!orgId) { setLoading(false); return }
@@ -39,6 +41,7 @@ export default function AdminSettingsPage() {
       const s: OrgSettings = data.settings
       setSenderName(s.sender_name || "")
       setReplyTo(s.reply_to || "")
+      setBrandColor(s.brand_color || "")
     } catch {
       toast.error("Erreur lors du chargement des paramètres")
     } finally {
@@ -59,6 +62,7 @@ export default function AdminSettingsPage() {
           org_id: orgId,
           sender_name: senderName || null,
           reply_to: replyTo || null,
+          brand_color: brandColor || null,
         }),
       })
       if (!res.ok) {
@@ -139,6 +143,36 @@ export default function AdminSettingsPage() {
             </div>
           </div>
 
+          {/* Couleur de marque blanche */}
+          <div className="space-y-2">
+            <Label htmlFor="brand-color">Couleur de marque</Label>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={/^#[0-9a-fA-F]{6}$/.test(brandColor) ? brandColor : "#24405E"}
+                onChange={(e) => setBrandColor(e.target.value)}
+                className="h-9 w-12 cursor-pointer rounded border bg-background p-1"
+                aria-label="Choisir la couleur de marque"
+              />
+              <Input
+                id="brand-color"
+                placeholder="#24405E"
+                value={brandColor}
+                onChange={(e) => setBrandColor(e.target.value)}
+                className="w-32 font-mono"
+                maxLength={7}
+              />
+              {brandColor && (
+                <button type="button" onClick={() => setBrandColor("")} className="text-xs text-muted-foreground hover:text-foreground">
+                  Réinitialiser
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Votre couleur d&apos;accent en marque blanche — utilisée sur la page de désabonnement (logo, boutons). Vide = neutre.
+            </p>
+          </div>
+
           {/* Aperçu */}
           <div className="space-y-2 rounded-lg border bg-muted/40 p-4">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Aperçu</p>
@@ -154,6 +188,12 @@ export default function AdminSettingsPage() {
               <MessageSquare className="h-4 w-4 text-indigo-500 shrink-0" />
               <span>
                 Messages Discord postés sous le nom <span className="font-semibold">{previewName}</span>
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="inline-block h-4 w-4 shrink-0 rounded-full border" style={{ background: /^#[0-9a-fA-F]{6}$/.test(brandColor) ? brandColor : "#24405E" }} />
+              <span>
+                Couleur de marque {brandColor ? <code className="font-mono text-xs">{brandColor}</code> : <span className="text-muted-foreground">(neutre par défaut)</span>}
               </span>
             </div>
           </div>

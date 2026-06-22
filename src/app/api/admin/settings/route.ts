@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   const { data } = await supabase
     .schema('notifications')
     .from('org_settings')
-    .select('sender_name, reply_to, sender_domain, domain_status')
+    .select('sender_name, reply_to, sender_domain, domain_status, brand_color')
     .eq('org_id', auth.org_id)
     .single()
 
@@ -24,13 +24,14 @@ export async function GET(request: NextRequest) {
       reply_to: null,
       sender_domain: null,
       domain_status: 'unconfigured',
+      brand_color: null,
     },
   })
 }
 
 // PUT /api/admin/settings
 export async function PUT(request: NextRequest) {
-  let body: { org_id?: string; sender_name?: string | null; reply_to?: string | null }
+  let body: { org_id?: string; sender_name?: string | null; reply_to?: string | null; brand_color?: string | null }
   try {
     body = await request.json()
   } catch {
@@ -52,15 +53,21 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Adresse de réponse invalide' }, { status: 400 })
   }
 
+  const payload: Record<string, unknown> = { org_id: auth.org_id, sender_name: senderName, reply_to: replyTo }
+  if (body.brand_color !== undefined) {
+    const bc = body.brand_color?.trim() || null
+    if (bc && !/^#[0-9a-fA-F]{6}$/.test(bc)) {
+      return NextResponse.json({ error: 'Couleur invalide (format #RRGGBB attendu)' }, { status: 400 })
+    }
+    payload.brand_color = bc
+  }
+
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .schema('notifications')
     .from('org_settings')
-    .upsert(
-      { org_id: auth.org_id, sender_name: senderName, reply_to: replyTo },
-      { onConflict: 'org_id' }
-    )
-    .select('sender_name, reply_to, sender_domain, domain_status')
+    .upsert(payload, { onConflict: 'org_id' })
+    .select('sender_name, reply_to, sender_domain, domain_status, brand_color')
     .single()
 
   if (error) {
