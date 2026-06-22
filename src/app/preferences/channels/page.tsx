@@ -65,20 +65,36 @@ function UserChannelsContent() {
     if (typeof window === "undefined") return
     const q = new URLSearchParams(window.location.search)
     const h = new URLSearchParams(window.location.hash.replace(/^#/, ""))
+    if (q.get("discord") === "linked") {
+      toast.success("Compte Discord connecté")
+      window.history.replaceState({}, "", window.location.pathname)
+      return
+    }
     const code = q.get("error_code") || h.get("error_code")
     const desc = q.get("error_description") || h.get("error_description")
     if (!code && !desc) return
     const msg =
       code === "identity_already_exists"
         ? "Ce compte est déjà lié à un autre profil. Connectez-vous avec ce profil pour l'utiliser, ou détachez-le d'abord."
-        : desc
-          ? decodeURIComponent(desc.replace(/\+/g, " "))
-          : "La connexion du compte a échoué."
+        : code === "discord_not_configured"
+          ? "La connexion Discord n'est pas encore configurée côté serveur."
+          : code?.startsWith("discord")
+            ? "La connexion du compte Discord a échoué. Réessayez."
+            : desc
+              ? decodeURIComponent(desc.replace(/\+/g, " "))
+              : "La connexion du compte a échoué."
     toast.error(msg)
     window.history.replaceState({}, "", window.location.pathname)
   }, [])
 
   const connect = async (provider: (typeof PROVIDERS)[number]["id"]) => {
+    // Discord = canal de LIVRAISON : OAuth dédié (récupère l'ID, pas un login)
+    // → gère n'importe quel compte, y compris un alt.
+    if (provider === "discord") {
+      window.location.href = "/api/user/channels/discord/start"
+      return
+    }
+    // Email (Google…) = identité Supabase liée (email vérifié par le provider).
     const { error } = await supabase.auth.linkIdentity({
       provider,
       options: { redirectTo: typeof window !== "undefined" ? window.location.href : undefined },
