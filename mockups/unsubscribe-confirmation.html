@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Désabonnement — Rocalys Esport</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,560&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  /* ===========================================================
+     MAQUETTE — Page de confirmation de désabonnement (marque blanche)
+     La couleur --brand est injectée dynamiquement = couleur du club.
+     Ici : exemple "Rocalys Esport" (indigo). Le cuivre Quatools n'apparaît
+     volontairement nulle part : la page appartient au club.
+     =========================================================== */
+  :root{
+    --brand:#4538CC;            /* couleur du club (white-label) */
+    --brand-deep:#362BA6;
+    --brand-soft:rgba(69,56,204,.075);
+    --brand-tint:rgba(69,56,204,.14);
+
+    --cream:#F7F3EA;
+    --card:#FFFEFB;
+    --line:#E2DBCB;
+    --ink:#1E2430;
+    --navy:#24405E;
+    --muted:#8C8576;
+    --faint:#A9A293;
+    --green:#2F7D5B;
+
+    --r:24px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:'Inter',system-ui,sans-serif;
+    color:var(--ink);
+    background:var(--cream);
+    -webkit-font-smoothing:antialiased;
+    display:flex;align-items:center;justify-content:center;
+    padding:28px 18px;
+    position:relative;overflow-x:hidden;
+  }
+  /* Atmosphère : halo doux aux couleurs du club en haut + grain discret */
+  body::before{
+    content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:
+      radial-gradient(120% 60% at 50% -10%, var(--brand-soft), transparent 60%),
+      radial-gradient(80% 50% at 110% 0%, rgba(192,91,46,.04), transparent 55%);
+  }
+  body::after{
+    content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.025'/%3E%3C/svg%3E");
+  }
+
+  .card{
+    position:relative;z-index:1;
+    width:100%;max-width:480px;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--r);
+    box-shadow:0 1px 0 rgba(255,255,255,.7) inset, 0 18px 50px -24px rgba(36,40,52,.28), 0 4px 12px -6px rgba(36,40,52,.10);
+    padding:30px 30px 22px;
+  }
+  @media (max-width:430px){ .card{padding:26px 20px 20px} }
+
+  /* reveals échelonnés au chargement */
+  .r{opacity:0;transform:translateY(10px);animation:rise .65s cubic-bezier(.2,.7,.2,1) forwards}
+  .r1{animation-delay:.05s}.r2{animation-delay:.16s}.r3{animation-delay:.30s}
+  .r4{animation-delay:.44s}.r5{animation-delay:.56s}.r6{animation-delay:.66s}
+  @keyframes rise{to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){.r{animation:none;opacity:1;transform:none}}
+
+  /* 1 — Bandeau marque */
+  .brand{display:flex;align-items:center;gap:11px;padding-bottom:18px;border-bottom:1px solid var(--line)}
+  .logo{
+    width:38px;height:38px;border-radius:50%;flex:0 0 auto;
+    background:linear-gradient(150deg,var(--brand),var(--brand-deep));
+    color:#fff;display:flex;align-items:center;justify-content:center;
+    font-family:'Fraunces',serif;font-weight:560;font-size:18px;
+    box-shadow:0 4px 12px -4px var(--brand-tint);
+  }
+  .brand-name{font-weight:600;font-size:15px;letter-spacing:-.01em}
+  .brand-kicker{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin-top:1px}
+
+  /* 2 — Confirmation */
+  .confirm{text-align:center;padding:26px 4px 22px}
+  .bell{
+    width:56px;height:56px;margin:0 auto 16px;border-radius:50%;
+    background:var(--brand-soft);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .bell svg{width:26px;height:26px;stroke:var(--brand);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .confirm h1{font-family:'Fraunces',serif;font-weight:500;font-size:30px;line-height:1.05;letter-spacing:-.01em;color:var(--navy)}
+  .confirm p{margin-top:9px;font-size:15px;color:var(--muted);line-height:1.5}
+  .notif{color:var(--ink);font-weight:600;white-space:nowrap}
+
+  /* 3 — Récupération / reroute (bloc héros) */
+  .reroute{
+    margin-top:4px;position:relative;
+    background:var(--brand-soft);
+    border:1px solid var(--brand-tint);
+    border-radius:16px;
+    padding:18px 18px 16px;
+  }
+  .reroute .lead{font-size:14.5px;font-weight:600;color:var(--navy);letter-spacing:-.01em}
+  .reroute .sub{font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.45}
+  .reroute-actions{display:flex;gap:9px;margin-top:14px}
+  @media (max-width:430px){ .reroute-actions{flex-direction:column} }
+  .btn{
+    flex:1;display:flex;align-items:center;justify-content:center;gap:8px;
+    font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;
+    border-radius:11px;padding:11px 12px;text-decoration:none;
+    transition:transform .15s ease, box-shadow .2s ease, background .2s ease;
+  }
+  .btn svg{width:16px;height:16px;flex:0 0 auto}
+  .btn-primary{background:var(--brand);color:#fff;border:1px solid var(--brand);box-shadow:0 8px 18px -10px var(--brand-tint)}
+  .btn-primary:hover{background:var(--brand-deep);transform:translateY(-1px);box-shadow:0 12px 22px -10px var(--brand-tint)}
+  .btn-ghost{background:#fff;color:var(--navy);border:1px solid var(--line)}
+  .btn-ghost:hover{transform:translateY(-1px);border-color:var(--brand-tint);box-shadow:0 8px 18px -12px rgba(36,40,52,.2)}
+
+  /* 4 — Feedback 1-tap */
+  .fb{margin-top:24px;text-align:center;transition:opacity .3s ease}
+  .fb-label{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:13px}
+  .chip{
+    font-family:inherit;font-size:12.5px;font-weight:500;color:var(--navy);cursor:pointer;
+    background:#fff;border:1px solid var(--line);border-radius:999px;padding:7px 13px;
+    transition:transform .14s ease, background .18s ease, color .18s ease, border-color .18s ease, box-shadow .2s ease;
+  }
+  .chip:hover{transform:translateY(-1px);border-color:var(--brand-tint);box-shadow:0 6px 14px -10px rgba(36,40,52,.25)}
+  .chip.selected{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 8px 16px -8px var(--brand-tint)}
+  .chip.dim{opacity:.4;pointer-events:none}
+  .fb-thanks{
+    display:none;align-items:center;justify-content:center;gap:8px;
+    margin-top:6px;font-size:14px;font-weight:600;color:var(--green);
+  }
+  .fb-thanks svg{width:18px;height:18px;stroke:var(--green);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .fb.done .chips,.fb.done .fb-label{display:none}
+  .fb.done .fb-thanks{display:flex;animation:rise .4s both}
+
+  /* 5 — Gérer tout */
+  .manage{display:block;text-align:center;margin-top:24px;font-size:13.5px;font-weight:600;color:var(--navy);text-decoration:none;transition:color .15s,gap .15s}
+  .manage:hover{color:var(--brand)}
+  .manage .arrow{display:inline-block;transition:transform .18s ease}
+  .manage:hover .arrow{transform:translateX(3px)}
+
+  /* 6 — Pied de page (hub effacé) */
+  .foot{margin-top:20px;padding-top:14px;border-top:1px solid var(--line);text-align:center}
+  .foot span{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#C3BCAD}
+</style>
+</head>
+<body>
+  <main class="card">
+
+    <!-- 1 — Marque du club -->
+    <header class="brand r r1">
+      <div class="logo">R</div>
+      <div>
+        <div class="brand-name">Rocalys Esport</div>
+        <div class="brand-kicker">Vos notifications</div>
+      </div>
+    </header>
+
+    <!-- 2 — Confirmation -->
+    <section class="confirm r r2">
+      <div class="bell" aria-hidden="true">
+        <!-- bell-off -->
+        <svg viewBox="0 0 24 24"><path d="M8.7 3.6A6 6 0 0 1 18 8c0 2.2.5 3.9 1.3 5.1M17.7 17.7A2 2 0 0 1 16 18H5l1.4-1.7A8 8 0 0 0 8 11"/><path d="M10.3 21a2 2 0 0 0 3.4 0"/><path d="M3 3l18 18"/></svg>
+      </div>
+      <h1>C'est noté.</h1>
+      <p>Tu ne recevras plus la notification<br><span class="notif">« Paiement échoué »</span> de Rocalys.</p>
+    </section>
+
+    <!-- 3 — Récupération / reroute (le bloc le plus important) -->
+    <section class="reroute r r3">
+      <div class="lead">Tu voulais juste changer de canal&nbsp;?</div>
+      <div class="sub">Garde l'info, autrement. Reçois « Paiement échoué » là où ça t'arrange — sans rien rater.</div>
+      <div class="reroute-actions">
+        <a class="btn btn-primary" href="#">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.3 5.3A16 16 0 0 0 15.5 4l-.2.4a14.7 14.7 0 0 1 3.4 1.1 14 14 0 0 0-11.6 0A14.7 14.7 0 0 1 10.7 4l-.2-.4A16 16 0 0 0 6.7 5.3 16.5 16.5 0 0 0 4 16.5a16 16 0 0 0 4.9 2.5l.4-.6a10.5 10.5 0 0 1-1.6-.8l.4-.3a11.4 11.4 0 0 0 9.8 0l.4.3a10.5 10.5 0 0 1-1.6.8l.4.6A16 16 0 0 0 22 16.5a16.5 16.5 0 0 0-2.7-11.2ZM9.7 14.3c-.8 0-1.4-.7-1.4-1.6s.6-1.6 1.4-1.6 1.5.7 1.4 1.6c0 .9-.6 1.6-1.4 1.6Zm4.6 0c-.8 0-1.4-.7-1.4-1.6s.6-1.6 1.4-1.6 1.5.7 1.4 1.6c0 .9-.6 1.6-1.4 1.6Z"/></svg>
+          Recevoir sur Discord
+        </a>
+        <a class="btn btn-ghost" href="#">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m3.5 6.5 8.5 6 8.5-6"/></svg>
+          Une autre adresse
+        </a>
+      </div>
+    </section>
+
+    <!-- 4 — Feedback optionnel 1-tap -->
+    <section class="fb r r4" id="fb">
+      <div class="fb-label">Ça aiderait Rocalys de savoir pourquoi · optionnel</div>
+      <div class="chips" id="chips">
+        <button class="chip">Trop souvent</button>
+        <button class="chip">Pas pertinent</button>
+        <button class="chip">Mauvais moment</button>
+        <button class="chip">Je préfère un autre canal</button>
+        <button class="chip">Autre</button>
+      </div>
+      <div class="fb-thanks">
+        <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+        Merci, c'est noté 🙏
+      </div>
+    </section>
+
+    <!-- 5 — Contrôle total -->
+    <a class="manage r r5" href="#">Gérer toutes mes notifications <span class="arrow">→</span></a>
+
+    <!-- 6 — Hub effacé derrière la marque -->
+    <footer class="foot r r6">
+      <span>Notifications gérées via Quatools</span>
+    </footer>
+
+  </main>
+
+<script>
+  // Feedback 1-tap : un clic suffit, puis remerciement. Aucun champ obligatoire.
+  const fb = document.getElementById('fb');
+  document.querySelectorAll('#chips .chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('#chips .chip').forEach(c => {
+        if (c !== chip) c.classList.add('dim');
+      });
+      chip.classList.add('selected');
+      // (ici : POST de la raison → opt-out déjà créé, on le complète)
+      setTimeout(() => fb.classList.add('done'), 480);
+    });
+  });
+</script>
+</body>
+</html>
