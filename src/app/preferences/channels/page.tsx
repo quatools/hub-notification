@@ -27,7 +27,6 @@ const SOON = ["SMS", "WhatsApp", "Slack", "Telegram", "Notification push", "Webh
 const PROVIDERS = [
   { id: "discord", label: "Discord" },
   { id: "google", label: "Google" },
-  { id: "github", label: "GitHub" },
 ] as const
 
 function channelView(c: UserChannel): { Icon: typeof Mail; primary: string; secondary: string } {
@@ -60,6 +59,24 @@ function UserChannelsContent() {
   useEffect(() => {
     load()
   }, [load])
+
+  // Erreur OAuth renvoyée dans l'URL au retour de linkIdentity (query ou hash).
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const q = new URLSearchParams(window.location.search)
+    const h = new URLSearchParams(window.location.hash.replace(/^#/, ""))
+    const code = q.get("error_code") || h.get("error_code")
+    const desc = q.get("error_description") || h.get("error_description")
+    if (!code && !desc) return
+    const msg =
+      code === "identity_already_exists"
+        ? "Ce compte est déjà lié à un autre profil. Connectez-vous avec ce profil pour l'utiliser, ou détachez-le d'abord."
+        : desc
+          ? decodeURIComponent(desc.replace(/\+/g, " "))
+          : "La connexion du compte a échoué."
+    toast.error(msg)
+    window.history.replaceState({}, "", window.location.pathname)
+  }, [])
 
   const connect = async (provider: (typeof PROVIDERS)[number]["id"]) => {
     const { error } = await supabase.auth.linkIdentity({
@@ -119,7 +136,7 @@ function UserChannelsContent() {
       </div>
 
       <p className="text-sm text-muted-foreground mb-6">
-        Connectez vos comptes (Discord, Google, GitHub) pour recevoir vos notifications là où vous êtes. La
+        Connectez vos comptes (Discord, Google) pour recevoir vos notifications là où vous êtes. La
         possession est <strong>vérifiée par le service</strong> — on n&apos;envoie jamais vers une adresse non prouvée.
       </p>
 
