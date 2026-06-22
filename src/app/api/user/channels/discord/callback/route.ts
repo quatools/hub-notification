@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(done)
   }
 
-  const clientId = process.env.NEXT_PUBLIC_DISCORD_APP_ID
+  const clientId = process.env.DISCORD_OAUTH_CLIENT_ID
   const clientSecret = process.env.DISCORD_OAUTH_CLIENT_SECRET
   if (!clientId || !clientSecret) {
     done.searchParams.set('error_code', 'discord_not_configured')

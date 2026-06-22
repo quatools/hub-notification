@@ -18,7 +18,9 @@ export async function GET(request: NextRequest) {
   const user = await getAuthenticatedUser()
   if (!user) return NextResponse.redirect(new URL('/login', base))
 
-  const clientId = process.env.NEXT_PUBLIC_DISCORD_APP_ID
+  // App OAuth = celle du LOGIN Discord (même client_id/secret que GoTrue), pas
+  // l'app du bot. Sinon le secret ne matche pas le client_id (invalid_client).
+  const clientId = process.env.DISCORD_OAUTH_CLIENT_ID
   if (!clientId) {
     const done = new URL('/preferences/channels', base)
     done.searchParams.set('error_code', 'discord_not_configured')
