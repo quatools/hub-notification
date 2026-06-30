@@ -62,7 +62,7 @@ Un `app` éventuel dans le body est **ignoré** (cohérent avec `/orgs` et `/emi
 | `slug` | string | ✅ | Identifiant unique `app.categorie.action`. |
 | `label` | string | ✅ | Nom affiché dans l'UI admin. |
 | `description` | string | — | Description détaillée. |
-| `category` | string | ✅ | Regroupement. Valeurs reconnues par l'admin : `billing`, `member`, `team`, `shop`, `system`. Une autre valeur reste valide mais s'affiche sous « Autre ». |
+| `category` | string | ✅ | **Nom du regroupement, choisi librement par votre app** — l'admin l'affiche **tel quel**. Les 5 clés `billing`, `member`, `team`, `shop`, `system` reçoivent en plus un libellé FR + une couleur dédiés ; toute autre valeur s'affiche sous **son propre nom** (« Autre » uniquement si vide). |
 | `supported_channels` | string[] | ✅ | `email`, `discord_webhook`, `discord_dm`. |
 | `audiences` | string[] | ✅ | `admin`, `member`. Voir [Audiences](/concepts/audiences). |
 | `default_active` | boolean | — | Défaut `false`. |
