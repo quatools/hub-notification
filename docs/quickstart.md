@@ -43,9 +43,9 @@ Content-Type: application/json
 
 Réponse : `{ "org_id": "…", "created": true }`. Stockez l'`org_id` (idempotent
 par `external_id`), il sert pour tout le reste — `emit`, workflows, droits admin.
-Pour donner les droits à un administrateur humain, utilisez le
-[lien admin](/api/link#lien-admin-octroi-de-droits). Détails :
-[`/orgs`](/api/orgs).
+Créer l'org **ne donne de droits à personne** : à l'**étape 2** ci-dessous, vous
+générez vous-même votre **premier lien admin** pour en devenir propriétaire.
+Détails : [`/orgs`](/api/orgs).
 
 ## 1. Déclarer ses événements
 
@@ -83,7 +83,49 @@ Content-Type: application/json
 
 Détail des champs : voir [POST /register](/api/register).
 
-## 2. Configurer un workflow (côté admin)
+## 2. Devenez admin de votre organisation
+
+Créer l'org ne donne de droits à personne. Pour la configurer (canaux, workflows)
+dans `/admin`, il faut être **admin** — et **c'est vous qui générez le lien**, la
+première fois comme les suivantes.
+
+::: tip Pas de poule-et-œuf : vous forgez le lien vous-même
+Aucun admin préalable n'est requis. Votre app **signe elle-même** un jeton avec
+son **secret de signature** (`NOTIFICATION_SIGNING_SECRET`) — le secret **fait
+autorité**. Le **premier** à ouvrir le lien devient **propriétaire** (`owner`) de
+l'org ; les suivants sont `admin`.
+:::
+
+```typescript
+import { createHmac } from 'crypto'
+
+function mintLinkToken(payload: Record<string, unknown>, secret: string) {
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url')
+  const sig = createHmac('sha256', secret).update(body).digest('base64url')
+  return `${body}.${sig}`
+}
+
+const token = mintLinkToken(
+  {
+    app: 'votre-slug',        // le SLUG de votre app (qui possède l'org)
+    app_user_id: 'votre-id',  // votre identifiant côté app
+    scope: 'admin',
+    org_id: '<org_id>',       // renvoyé par /orgs
+    email: 'vous@exemple.fr',
+    exp: Math.floor(Date.now() / 1000) + 120, // expiration courte (2 min)
+  },
+  process.env.NOTIFICATION_SIGNING_SECRET!,
+)
+
+// Ouvrez ce lien dans un navigateur (connecté au hub) → vous devenez owner/admin :
+//   `${process.env.NOTIFICATION_HUB_URL}/api/link-admin?token=${token}`
+```
+
+Ensuite, depuis le hub (page **Équipe**), l'owner invite/promeut les autres
+admins — rien à coder de plus. Détails et rôles :
+[Lien admin](/api/link#lien-admin-octroi-de-droits).
+
+## 3. Configurer un workflow (côté admin)
 
 ::: warning Sans workflow, rien n'est envoyé
 Tant qu'aucun **workflow actif** n'existe pour l'événement et l'organisation,
@@ -106,7 +148,7 @@ Corps : Ton abonnement {{plan_name}} ({{amount}} €) chez {{club_name}}
         est actif. Bienvenue dans l'équipe !
 ```
 
-## 3. Émettre l'événement
+## 4. Émettre l'événement
 
 Quand l'événement se produit dans votre app, appelez `emit`. Fournissez le
 **descripteur du destinataire concerné** dans `recipients` : c'est ce qui permet
@@ -157,7 +199,7 @@ N'attendez donc pas un statut « envoyé » dans la réponse — consultez
 l'historique ou les logs pour cela.
 :::
 
-## 4. Helper TypeScript prêt à l'emploi
+## 5. Helper TypeScript prêt à l'emploi
 
 ```typescript
 const HUB_URL = process.env.NOTIFICATION_HUB_URL ?? 'https://hub.quatools.fr'

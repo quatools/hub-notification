@@ -98,6 +98,13 @@ Le même mécanisme de jeton sert à **donner les droits d'administration** d'un
 organisation hub (créée via [`/orgs`](/api/orgs)) à un utilisateur — utile pour
 les applications tierces dont les organisations ne sont pas des clubs esport.
 
+::: tip C'est ainsi qu'on obtient le tout PREMIER admin
+Pas de poule-et-œuf : aucun admin n'existe encore, et c'est normal. Votre app
+**forge elle-même** ce lien avec son **secret de signature** (qui fait autorité) ;
+le **premier** à l'ouvrir devient **owner**. Vous n'avez besoin d'**aucun accès
+préalable** au hub — le secret suffit.
+:::
+
 Le jeton porte alors `scope: "admin"` et l'`org_id` ciblé :
 
 | Champ | Description |
