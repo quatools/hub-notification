@@ -1,0 +1,25 @@
+name: Sync docs → quatools.fr
+
+# Quand la doc change (docs/**), on déclenche un redéploiement du site studio
+# quatools.fr (Vercel). Le build du studio régénère alors le bundle de doc +
+# llms-full.txt depuis CE repo (branche master) via scripts/gen-docs-bundle.mjs.
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'docs/**'
+  workflow_dispatch:
+
+jobs:
+  trigger-studio:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Déclencher le redéploiement du studio (Vercel Deploy Hook)
+        env:
+          HOOK: ${{ secrets.VERCEL_DOCS_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::warning::Secret VERCEL_DOCS_DEPLOY_HOOK absent — ajoutez-le pour activer l'auto-déploiement de la doc."
+            exit 0
+          fi
+          curl -fsS -X POST "$HOOK" && echo "✅ Redéploiement du studio déclenché."
