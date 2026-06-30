@@ -250,5 +250,3 @@ try {
 - [Référence API complète](/api/overview)
 - [Comprendre les destinataires et le rattachement de compte](/concepts/recipients-identity)
 - [Configurer la marque blanche email](/guides/channels-email)
-
-<!-- sync-probe-Q7X -->
