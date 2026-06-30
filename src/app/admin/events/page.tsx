@@ -29,14 +29,6 @@ interface EventWithWorkflows {
   workflows: Array<{ id: string; is_active: boolean }>
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  billing: "Facturation",
-  member: "Membres",
-  team: "Équipes",
-  shop: "Boutique & préventes",
-  system: "Système",
-}
-
 const APP_LABELS: Record<string, string> = {
   "baas-esport": "BAAS Esport",
   "cours-quatools": "Cours Quatools",
@@ -80,7 +72,7 @@ export default function AdminEventsPage() {
 
     const map = new Map<string, EventWithWorkflows[]>()
     for (const item of filtered) {
-      const cat = CATEGORY_LABELS[item.event.category] || item.event.category || "Autre"
+      const cat = item.event.category || "Autre"
       if (!map.has(cat)) map.set(cat, [])
       map.get(cat)!.push(item)
     }

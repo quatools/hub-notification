@@ -57,14 +57,6 @@ interface EventWithWorkflows {
   workflows: WorkflowItem[]
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  billing: "Facturation",
-  member: "Membres",
-  team: "Équipes",
-  shop: "Boutique & préventes",
-  system: "Système",
-}
-
 const CAT_COLOR: Record<string, string> = {
   billing: "#2F7D5B",
   member: "#C05B2E",
@@ -165,7 +157,7 @@ function WorkflowsContent() {
     const map = new Map<string, { key: string; items: EventWithWorkflows[] }>()
     for (const item of eventsWithWorkflows) {
       const key = item.event.category || "system"
-      const label = CATEGORY_LABELS[key] || key || "Autre"
+      const label = key
       if (!map.has(label)) map.set(label, { key, items: [] })
       map.get(label)!.items.push(item)
     }
