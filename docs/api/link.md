@@ -34,7 +34,7 @@ Charge utile typique :
 
 | Champ | Description |
 |---|---|
-| `app` | Nom de l'app émettrice (préfixe d'identité). |
+| `app` | **Slug** de l'app émettrice (ex. `baas-esport`) — **pas** le nom affiché ni l'UUID de l'URL `/developer/<uuid>`. |
 | `app_user_id` | Id du membre côté app. |
 | `org_id` | Organisation concernée. |
 | `discord_id`, `email`, `name` | Coordonnées connues (optionnelles). |
@@ -102,7 +102,7 @@ Le jeton porte alors `scope: "admin"` et l'`org_id` ciblé :
 
 | Champ | Description |
 |---|---|
-| `app` | Nom de l'app (doit **posséder** l'org). |
+| `app` | **Slug** de l'app (doit **posséder** l'org). |
 | `app_user_id` | Id de l'admin côté app. |
 | `scope` | `"admin"`. |
 | `org_id` | L'organisation à administrer. |

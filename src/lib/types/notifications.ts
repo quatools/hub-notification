@@ -102,7 +102,8 @@ export interface WorkflowExecution {
 
 // --- API Request/Response (serveur-à-serveur) ---
 export interface RegisterRequest {
-  app: string
+  /** Ignoré : l'app est déduite de la clé API. Conservé pour rétrocompat. */
+  app?: string
   events: Array<{
     slug: string
     label: string

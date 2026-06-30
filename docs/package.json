@@ -5,6 +5,8 @@
   "description": "Documentation publique du Hub Notification (VitePress).",
   "scripts": {
     "dev": "vitepress dev",
+    "gen:llms": "node scripts/gen-llms.mjs",
+    "prebuild": "node scripts/gen-llms.mjs",
     "build": "vitepress build",
     "preview": "vitepress preview"
   },

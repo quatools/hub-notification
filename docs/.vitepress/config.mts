@@ -20,6 +20,7 @@ export default defineConfig({
       { text: 'Démarrage', link: '/quickstart' },
       { text: 'Concepts', link: '/concepts/overview' },
       { text: 'Référence API', link: '/api/emit' },
+      { text: 'llms.txt', link: '/llms-full.txt', target: '_blank', rel: 'noopener' },
       { text: 'GitHub', link: 'https://github.com/quatools/hub-notification' },
     ],
 

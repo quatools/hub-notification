@@ -29,7 +29,6 @@ Content-Type: application/json
 
 ```json
 {
-  "app": "baas-esport",
   "events": [
     {
       "slug": "baas.subscription.created",
@@ -50,6 +49,12 @@ Content-Type: application/json
 }
 ```
 
+::: info L'app est déduite de votre clé API
+Pas besoin d'un champ `app` au niveau racine : le hub identifie votre application
+via la **clé API** (`Bearer`), et vos événements ne peuvent appartenir qu'à elle.
+Un `app` éventuel dans le body est **ignoré** (cohérent avec `/orgs` et `/emit`).
+:::
+
 ## Champs d'un événement
 
 | Champ | Type | Requis | Description |
@@ -57,7 +62,7 @@ Content-Type: application/json
 | `slug` | string | ✅ | Identifiant unique `app.categorie.action`. |
 | `label` | string | ✅ | Nom affiché dans l'UI admin. |
 | `description` | string | — | Description détaillée. |
-| `category` | string | ✅ | Regroupement (`billing`, `member`, `team`, `system`). |
+| `category` | string | ✅ | Regroupement. Valeurs reconnues par l'admin : `billing`, `member`, `team`, `shop`, `system`. Une autre valeur reste valide mais s'affiche sous « Autre ». |
 | `supported_channels` | string[] | ✅ | `email`, `discord_webhook`, `discord_dm`. |
 | `audiences` | string[] | ✅ | `admin`, `member`. Voir [Audiences](/concepts/audiences). |
 | `default_active` | boolean | — | Défaut `false`. |
@@ -84,7 +89,8 @@ Content-Type: application/json
 | Code | Cause |
 |---|---|
 | `401` | Clé API invalide ou manquante. |
-| `400` | Body invalide (`app` ou `events` manquant). |
+| `400` | `events` manquant/vide, ou un event sans `slug`/`label`/`category`/`supported_channels`/`audiences`. |
+| `409` | Un `slug` est déjà déclaré par une autre application. |
 
 ::: tip Voir aussi
 [Concept : Événements](/concepts/events) pour la convention de nommage et le

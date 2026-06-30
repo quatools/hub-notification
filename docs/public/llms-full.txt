@@ -1,0 +1,1808 @@
+# Hub Notification — Documentation complète (llms-full.txt)
+
+> Documentation complète du Hub de notification Quatools, concaténée en un seul
+> fichier texte pour les agents IA, curl et l'indexation. La doc interactive
+> (SPA VitePress) n'est pas lisible par un fetch ; ce fichier l'est.
+>
+> Source : https://www.quatools.fr/hub/docs · Dépôt : https://github.com/quatools/hub-notification
+
+
+---
+
+# Fichier : index.md
+
+## En une phrase
+
+**Hub Notification** centralise toutes les notifications de vos applications
+(abonnements, paiements, inscriptions, rappels…) derrière une seule API. Vos
+apps déclarent leurs **événements** et les **émettent** ; les administrateurs
+câblent des **workflows** (événement → canal → message) ; les **membres**
+gardent la main sur ce qu'ils reçoivent et où.
+
+```text
+   Votre app                Hub Notification              Destinataire
+      │                            │                            │
+      │── register (events) ──────▶│                            │
+      │                            │  (admin configure          │
+      │                            │   canaux + workflows)      │
+      │── emit (événement) ───────▶│                            │
+      │                            │── Email ──────────────────▶│
+      │◀── { dispatched: N } ──────│── Discord ────────────────▶│
+      │                            │── … ──────────────────────▶│
+```
+
+## Par où commencer
+
+- **Vous intégrez une app ?** → [Démarrage rapide](/quickstart) puis
+  [Référence API](/api/overview).
+- **Vous voulez comprendre le modèle ?** → [Vue d'ensemble](/concepts/overview).
+- **Vous configurez une organisation ?** → [Configuration par l'IA (MCP)](/guides/mcp)
+  ou les guides [Discord](/guides/channels-discord) et [Email](/guides/channels-email).
+
+
+---
+
+# Fichier : quickstart.md
+
+# Démarrage rapide
+
+Ce guide intègre une application au hub en trois étapes : **déclarer** ses
+événements, les **émettre**, et laisser un admin **configurer** un workflow
+pour qu'ils soient réellement envoyés.
+
+## Étape 1 — Récupérez votre clé d'intégration
+
+Tout commence par la création de votre **application** dans le hub :
+
+1. Connectez-vous au hub (**[hub.quatools.fr](https://hub.quatools.fr)**) — Discord, Google ou GitHub.
+2. Cliquez sur **votre avatar** (en haut à droite) → **Espace développeur**.
+3. **Nouvelle application** → un nom et un identifiant (ex. `storm`).
+4. **Générez une clé** → copiez-la (elle n'est affichée **qu'une seule fois**), ainsi que le **secret de signature**.
+
+Vous obtenez les variables à placer dans l'environnement de votre application :
+
+```text
+NOTIFICATION_HUB_URL=https://hub.quatools.fr
+NOTIFICATION_API_KEY=<votre clé>
+NOTIFICATION_SIGNING_SECRET=<votre secret de signature>
+```
+
+> **Mode essai**
+Une application démarre en **essai** (un petit nombre d'envois, suffisant pour valider
+l'intégration). Une fois votre intégration prête, l'opérateur la passe en « actif »
+après une revue rapide de ce qu'elle envoie.
+
+## Déclarer son organisation
+
+Une **organisation** est l'un de vos espaces (un club, une équipe, un tenant…) :
+elle porte ses propres destinataires et sa configuration (canaux, workflows).
+Déclarez chacune pour obtenir son `org_id` :
+
+```http
+POST /api/notifications/orgs
+Authorization: Bearer <API_KEY>
+Content-Type: application/json
+
+{ "external_id": "votre-id-interne", "name": "Nom de l'organisation" }
+```
+
+Réponse : `{ "org_id": "…", "created": true }`. Stockez l'`org_id` (idempotent
+par `external_id`), il sert pour tout le reste — `emit`, workflows, droits admin.
+Pour donner les droits à un administrateur humain, utilisez le
+[lien admin](/api/link#lien-admin-octroi-de-droits). Détails :
+[`/orgs`](/api/orgs).
+
+## 1. Déclarer ses événements
+
+Au démarrage de votre app (ou via un script de seed), déclarez les événements
+que vous savez émettre. C'est un *upsert* : ré-appeler avec le même `slug` met
+l'événement à jour.
+
+```http
+POST /api/notifications/register
+Authorization: Bearer <API_KEY>
+Content-Type: application/json
+```
+
+```json
+{
+  "events": [
+    {
+      "slug": "baas.subscription.created",
+      "label": "Nouvel abonnement",
+      "description": "Un membre vient de souscrire à un abonnement",
+      "category": "billing",
+      "supported_channels": ["email", "discord_webhook", "discord_dm"],
+      "audiences": ["admin", "member"],
+      "default_active": true,
+      "payload_schema": {
+        "member_name": "string",
+        "plan_name": "string",
+        "amount": "number",
+        "club_name": "string"
+      }
+    }
+  ]
+}
+```
+
+Détail des champs : voir [POST /register](/api/register).
+
+## 2. Configurer un workflow (côté admin)
+
+> **Sans workflow, rien n'est envoyé**
+Tant qu'aucun **workflow actif** n'existe pour l'événement et l'organisation,
+`emit` répondra `dispatched: 0`. Un admin doit d'abord :
+
+1. créer au moins un **canal** (webhook Discord, email, DM Discord) ;
+2. créer un **workflow** reliant l'événement au canal, avec un message.
+
+Deux façons de configurer :
+
+- **Interface admin** : `/admin?org_id=<org_id>` → *Canaux* puis *Workflows*.
+- **En langage naturel** via le serveur MCP — voir [Configuration par l'IA](/guides/mcp).
+
+Le message utilise une syntaxe `{{variable}}` remplie depuis le payload :
+
+```text
+Sujet : Bienvenue {{member_name}} 🎉
+Corps : Ton abonnement {{plan_name}} ({{amount}} €) chez {{club_name}}
+        est actif. Bienvenue dans l'équipe !
+```
+
+## 3. Émettre l'événement
+
+Quand l'événement se produit dans votre app, appelez `emit`. Fournissez le
+**descripteur du destinataire concerné** dans `recipients` : c'est ce qui permet
+au hub de livrer « au membre concerné » et de rattacher la notification à sa
+fiche.
+
+```http
+POST /api/notifications/emit
+Authorization: Bearer <API_KEY>
+Content-Type: application/json
+```
+
+```json
+{
+  "event": "baas.subscription.created",
+  "org_id": "uuid-de-l-organisation",
+  "recipients": [
+    {
+      "app_user_id": "membre-123",
+      "email": "jean@example.com",
+      "discord_id": "123456789012345678",
+      "name": "Jean Dupont"
+    }
+  ],
+  "payload": {
+    "member_name": "Jean Dupont",
+    "plan_name": "Premium",
+    "amount": 29.99,
+    "club_name": "Team Esport Lyon"
+  }
+}
+```
+
+Réponse :
+
+```json
+{
+  "dispatched": 2,
+  "channels": ["discord_dm", "email"],
+  "execution_ids": ["uuid-exec-1", "uuid-exec-2"]
+}
+```
+
+> **La réponse part immédiatement**
+`emit` crée les exécutions puis répond **sans attendre** l'envoi réel
+(SMTP/Discord peuvent être lents). Le dispatch se termine en arrière-plan.
+N'attendez donc pas un statut « envoyé » dans la réponse — consultez
+l'historique ou les logs pour cela.
+
+## 4. Helper TypeScript prêt à l'emploi
+
+```typescript
+const HUB_URL = process.env.NOTIFICATION_HUB_URL ?? 'https://hub.quatools.fr'
+const API_KEY = process.env.NOTIFICATION_API_KEY!
+
+interface RecipientDescriptor {
+  app_user_id?: string
+  email?: string
+  discord_id?: string
+  name?: string
+}
+
+export async function emitNotification(
+  event: string,
+  orgId: string,
+  payload: Record<string, unknown>,
+  recipients?: RecipientDescriptor[],
+) {
+  const res = await fetch(`${HUB_URL}/api/notifications/emit`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${API_KEY}`,
+    },
+    body: JSON.stringify({ event, org_id: orgId, payload, recipients }),
+    signal: AbortSignal.timeout(10_000),
+  })
+  if (!res.ok) throw new Error(`emit ${event} → ${res.status}`)
+  return res.json()
+}
+```
+
+> **Ne jamais bloquer le flux principal**
+Une notification ne doit jamais faire échouer une transaction métier.
+Encapsulez toujours l'appel dans un `try/catch` qui logge sans propager :
+
+```typescript
+try {
+  await emitNotification('baas.subscription.created', orgId, payload, [recipient])
+} catch (e) {
+  console.error('[Notification] emit échoué (non bloquant):', e)
+}
+```
+
+## Étapes suivantes
+
+- [Référence API complète](/api/overview)
+- [Comprendre les destinataires et le rattachement de compte](/concepts/recipients-identity)
+- [Configurer la marque blanche email](/guides/channels-email)
+
+
+---
+
+# Fichier : concepts/overview.md
+
+# Vue d'ensemble
+
+Hub Notification est un **hub de notifications multi-tenant**. Il découple
+*qui produit un événement* (vos applications) de *comment et à qui il est
+notifié* (canaux, messages, préférences). Vos apps n'ont qu'une chose à faire :
+**déclarer** leurs événements puis les **émettre**. Tout le reste — routage,
+templates, marque blanche, opt-out, historique — vit dans le hub.
+
+## Le modèle en quatre objets
+
+| Objet | Qui le crée | Rôle |
+|---|---|---|
+| **Événement** (`event`) | l'application (via `register`) | Décrit un type de notification : un slug, un libellé, les canaux supportés, les audiences, le schéma de payload. |
+| **Canal** (`channel`) | l'admin (ou le membre) | Une destination concrète : un webhook Discord, une boîte mail, un DM Discord. |
+| **Workflow** | l'admin | Une route : *événement → canal + message*. Sans workflow actif, rien n'est envoyé. |
+| **Exécution** (`execution`) | le hub | La trace d'un envoi : statut, destination, contenu rendu, erreur éventuelle. |
+
+À cela s'ajoute la couche **destinataires & identités** (CDC v2) qui donne au
+*membre* une existence propre dans le hub — voir
+[Destinataires & identités](/concepts/recipients-identity).
+
+## Le cycle de vie complet
+
+```text
+1. REGISTER   L'app déclare ses événements au démarrage.
+              POST /api/notifications/register
+
+2. CONFIGURE  Un admin crée des canaux et des workflows (UI, ou en langage
+              naturel via le serveur MCP).
+
+3. EMIT       L'app émet un événement avec un payload + les destinataires.
+              POST /api/notifications/emit
+
+4. RESOLVE    Le hub trouve les workflows actifs, résout les destinataires
+              canoniques, vérifie les opt-out.
+
+5. DISPATCH   Le hub applique le template, envoie sur chaque canal, et logge
+              une exécution. La réponse HTTP part immédiatement ; l'envoi se
+              poursuit en arrière-plan.
+```
+
+## Ce qui rend le hub différent
+
+### 1. Le membre possède ses préférences
+
+Dans la plupart des systèmes, les préférences de notification appartiennent à
+l'application. Ici, chaque destinataire a une **fiche canonique** et un **graphe
+d'identité** (app, Discord, email…). Il peut **refuser** une notification,
+**rediriger** vers ses propres canaux et consulter l'**historique** de ce qui
+lui a été envoyé — indépendamment de l'app qui a déclenché l'événement.
+
+### 2. Configurable par l'IA
+
+Chaque organisation dispose d'un **serveur MCP** dédié (`/api/mcp/{orgId}`).
+Un admin connecte Claude et configure ses canaux, workflows et messages **en
+langage naturel**. Voir [Configuration par l'IA (MCP)](/guides/mcp).
+
+### 3. Marque blanche
+
+Chaque organisation envoie sous **sa propre identité** : nom d'expéditeur,
+adresse de réponse, **domaine d'envoi vérifié** (SPF/DKIM/DMARC via Scaleway
+TEM), et embeds Discord à ses couleurs. Voir
+[Email & marque blanche](/guides/channels-email).
+
+### 4. Souverain et ouvert
+
+Email via **SMTP générique** (Scaleway TEM, Brevo, OVH… — aucun fournisseur US
+imposé), Discord natif, et code publié sous **licence MIT** : la transparence
+fait partie de l'offre.
+
+## Stack technique
+
+- **Next.js 16** (App Router) + React 19
+- **Supabase** (PostgreSQL, schéma `notifications`, Auth) — base partagée
+- **Nodemailer** (SMTP générique) pour l'email
+- **API REST Discord** (webhooks + bot) pour Discord
+- **OAuth 2.1 + PKCE** pour sécuriser le serveur MCP
+- **jose** (JWT), templates `{{variable}}` maison
+
+> **Note d'architecture**
+Le hub est conçu pour vivre **dans** l'infrastructure Supabase partagée de la
+suite Quatools (schéma `notifications` aux côtés des autres apps, `auth.users`
+commun). Il n'est pas pensé comme un binaire isolé « clone & run » : les
+applications qui l'émettent partagent la même base d'identité. Le code reste
+néanmoins entièrement auditable et réutilisable.
+
+
+---
+
+# Fichier : concepts/events.md
+
+# Événements
+
+Un **événement** décrit un *type* de notification qu'une application sait
+produire — par exemple « un membre a souscrit un abonnement ». Il ne contient
+aucune donnée concrète : c'est un contrat (slug, libellé, canaux supportés,
+variables attendues). Les données concrètes arrivent au moment de l'`emit`,
+dans le `payload`.
+
+## Anatomie d'un événement
+
+| Champ | Type | Requis | Description |
+|---|---|---|---|
+| `slug` | string | ✅ | Identifiant unique, format `app.categorie.action`. |
+| `label` | string | ✅ | Nom affiché dans l'UI admin. |
+| `description` | string | — | Description sous le libellé. |
+| `category` | string | ✅ | Regroupement UI : `billing`, `member`, `team`, `system`… |
+| `supported_channels` | string[] | ✅ | Canaux possibles : `email`, `discord_webhook`, `discord_dm`. |
+| `audiences` | string[] | ✅ | Qui peut recevoir : `admin`, `member`. Voir [Audiences](/concepts/audiences). |
+| `default_active` | boolean | — | Défaut `false`. |
+| `payload_schema` | object | — | Variables disponibles (`{ "clé": "type" }`), affichées à l'admin dans l'éditeur de message. |
+
+## Convention de nommage des slugs
+
+```text
+<app>.<category>.<action>
+
+baas.subscription.created
+baas.payment.failed
+cours.session.reminder
+facturation.invoice.generated
+```
+
+Un slug est **global** au hub et **unique**. Le préfixe d'app évite les
+collisions entre applications.
+
+## Catégories
+
+| Catégorie | Usage |
+|---|---|
+| `billing` | Abonnements, paiements, factures |
+| `member` | Inscriptions, profils, départs |
+| `team` | Assignations, composition d'équipe |
+| `system` | Alertes techniques, maintenance |
+
+Les catégories sont libres : elles servent au regroupement visuel et à la
+couleur des embeds Discord.
+
+## Le `payload_schema` n'est pas une validation
+
+Le `payload_schema` est **documentaire** : il indique à l'admin quelles
+variables <code v-pre>{{…}}</code> il peut utiliser dans ses messages. Le hub ne rejette pas un
+`emit` dont le payload diffère du schéma — une variable absente est simplement
+rendue vide. Gardez donc le schéma à jour pour l'expérience admin, mais
+considérez le payload réel comme la source de vérité.
+
+## Cycle de vie
+
+- **Enregistrement** : `POST /register` (upsert par `slug`).
+- **Dépréciation** : un événement avec `deprecated_at` non nul ou `is_active = false`
+  est rejeté à l'`emit` (404).
+
+Voir [POST /register](/api/register) pour le détail de l'appel.
+
+
+---
+
+# Fichier : concepts/channels.md
+
+# Canaux
+
+Un **canal** (`channel`) est une destination concrète où une notification peut
+être livrée. Un canal a un **type**, une **config** (qui dépend du type), et
+appartient soit à une **organisation** (`org_id` renseigné, partagé entre
+workflows) soit à un **membre** (`org_id = null`, canal personnel).
+
+## Types de canaux
+
+| Type | Config principale | Pour qui | Détail |
+|---|---|---|---|
+| `email` | `email`, ou `recipient: "member"` | admin & membre | SMTP générique. From en marque blanche. |
+| `discord_webhook` | `webhook_url` | admin | Publie un embed dans un salon Discord. |
+| `discord_dm` | `discord_user_id`, ou `recipient: "member"` | admin & membre | Message privé via le bot. |
+| `sms` | — | — | Réservé, non implémenté. |
+
+Voir les guides [Discord](/guides/channels-discord) et
+[Email & marque blanche](/guides/channels-email).
+
+## Adresse fixe vs « membre concerné »
+
+C'est la distinction la plus importante d'un canal. La clé `recipient` de la
+config détermine **à qui** le canal livre :
+
+- **Adresse fixe** (`recipient` absent, ou `email`/`discord_user_id` renseigné) :
+  le canal pointe toujours vers la **même** destination. Typiquement un webhook
+  de salon d'org, ou le DM/email d'un capitaine. Le destinataire enregistré est
+  le **créateur du workflow** (l'admin).
+
+- **Membre concerné** (`recipient: "member"`) : la destination est **résolue à
+  l'envoi** depuis le descripteur `recipients` de l'`emit`. Une livraison est
+  produite **par destinataire concerné**, sur **son** email ou **son** Discord,
+  et l'exécution est rattachée à **sa** fiche.
+
+> **Un canal « membre concerné » ne retombe jamais sur l'admin**
+Si un workflow utilise un canal `recipient: "member"` mais que l'`emit`
+n'a fourni **aucun** descripteur `recipients`, le hub **n'invente pas** de
+destination : l'exécution est marquée `failed` avec un message explicite. C'est
+volontaire — cela force l'app appelante à corriger son `emit` plutôt que
+d'envoyer par erreur la notification d'un membre à l'admin.
+
+## Vérification
+
+Un canal a un drapeau `is_verified` : la destination a été testée (webhook qui
+répond 200, email de test délivré, utilisateur Discord existant…). Un canal non
+vérifié peut quand même être utilisé, mais l'UI le signale.
+
+## Activation
+
+`is_active` permet de couper un canal sans le supprimer. Supprimer un canal
+supprime **en cascade** les workflows qui l'utilisent.
+
+
+---
+
+# Fichier : concepts/workflows.md
+
+# Workflows
+
+Un **workflow** est une **route** : il relie un *événement* à un *canal* et
+porte le *message* à envoyer. C'est l'objet que l'admin manipule le plus.
+
+```text
+Événement  ──▶  Workflow  ──▶  Canal
+baas.subscription.created       discord_dm (membre concerné)
+                  │
+                  └── message : « Bienvenue {{member_name}} 🎉 … »
+```
+
+Un même événement peut alimenter **plusieurs** workflows (un email *et* un DM
+Discord, par exemple). Chaque workflow actif produit sa propre livraison et sa
+propre exécution.
+
+## Workflow = événement + canal + étape(s)
+
+Le message et le format vivent dans une **étape** (`workflow_step`) :
+
+| Champ de l'étape | Description |
+|---|---|
+| `subject` | Sujet (email surtout). Supporte `{{variable}}`. |
+| `body` | Corps du message. Supporte `{{variable}}`. |
+| `format` | `text`, `html` ou `markdown`. |
+
+> **Une seule étape aujourd'hui, plusieurs demain**
+Le modèle prévoit plusieurs étapes par workflow (`send`, `wait`, `condition`)
+pour de futurs scénarios type automatisation. Aujourd'hui, un workflow a une
+seule étape `send`.
+
+## Templates `{{variable}}`
+
+Le corps et le sujet sont des templates : `{{member_name}}` est remplacé par
+`payload.member_name` au moment de l'envoi. Les variables disponibles sont
+celles du `payload_schema` de l'événement (affichées dans l'éditeur).
+
+```text
+Sujet : Paiement reçu — {{amount}} €
+Corps : Merci {{member_name}}, ton paiement de {{amount}} € pour
+        {{plan_name}} est confirmé.
+```
+
+### Email : fragment ou document complet
+
+Pour un canal email avec `format: html` :
+
+- un **fragment** HTML est automatiquement **enveloppé** dans une mise en page
+  de marque ;
+- un **document complet** (commençant par `<!DOCTYPE` / `<html>`) est envoyé
+  **tel quel**, sans habillage — utile pour des templates HTML sur-mesure.
+
+## Activation
+
+`is_active` active ou coupe la route. À l'`emit`, seuls les workflows **actifs**
+de l'organisation pour l'événement sont résolus.
+
+## Tester un workflow
+
+Avant de passer en production, un admin peut envoyer un **test** avec des
+données d'exemple (et une adresse de surcharge optionnelle). Les exécutions de
+test sont marquées `is_test = true` et n'apparaissent pas dans les statistiques
+de production. Voir l'outil `test_workflow` du [MCP](/guides/mcp).
+
+
+---
+
+# Fichier : concepts/audiences.md
+
+# Audiences
+
+L'**audience** d'un événement répond à la question : *à qui cette notification
+est-elle légitimement destinée ?* Elle est déclarée à l'enregistrement
+(`audiences: ["admin", "member"]`) et conditionne deux choses : ce qu'un membre
+peut voir/refuser, et le sens d'un canal « membre concerné ».
+
+## Les deux audiences
+
+| Audience | Signification |
+|---|---|
+| `admin` | Destinée aux gestionnaires de l'organisation (ex. « un paiement a échoué », « équipe au complet »). |
+| `member` | Destinée à la personne concernée par l'événement (ex. « ton abonnement est actif », « ta place est confirmée »). |
+
+Un événement peut avoir **les deux** : le même fait (`subscription.created`)
+peut notifier l'admin *et* le membre, via deux workflows distincts.
+
+## Conséquences concrètes
+
+### Côté membre : opt-out
+
+Un membre ne voit, dans son espace de préférences, que les workflows dont
+l'événement inclut l'audience **`member`**. Ce sont les seules notifications
+qu'il peut **refuser** (opt-out). Une notification d'audience `admin` (un
+webhook de salon, par exemple) est une **diffusion de gestion** : elle n'est pas
+soumise à l'opt-out du membre.
+
+### Côté routage : « membre concerné »
+
+Un canal `recipient: "member"` n'a de sens que pour un événement d'audience
+`member` : il livre à la personne concernée, résolue depuis le descripteur
+`recipients` de l'`emit`. Voir [Canaux](/concepts/channels) et
+[Destinataires & identités](/concepts/recipients-identity).
+
+## Règle mentale
+
+> **`admin`** = « l'organisation doit le savoir » → diffusion, pas d'opt-out membre.
+>
+> **`member`** = « cette personne doit le savoir » → livraison personnelle,
+> opt-out et reroute possibles.
+
+
+---
+
+# Fichier : concepts/recipients-identity.md
+
+# Destinataires & identités
+
+C'est la couche qui donne au **membre** une existence propre dans le hub,
+indépendante de l'app qui a déclenché l'événement. Elle répond à trois besoins
+que `auth.users` seul ne couvre pas :
+
+1. notifier quelqu'un **avant** qu'il ait un compte sur le hub ;
+2. reconnaître que **la même personne** existe dans **plusieurs apps** ;
+3. permettre au membre de **posséder** ses préférences (refuser, rediriger).
+
+## Deux objets
+
+### La fiche destinataire (`recipient`)
+
+Une **personne canonique**. Elle peut exister sans compte (fiche *flottante*)
+puis être *réclamée* quand la personne se connecte au hub.
+
+| Champ | Rôle |
+|---|---|
+| `id` | Identifiant canonique de la personne. |
+| `auth_user_id` | Lien vers le compte hub (`auth.users`), ou `null` si flottante. |
+| `is_claimed` | `true` une fois la fiche rattachée à un compte. |
+| `display_name`, `locale` | Affichage. |
+
+### Le graphe d'identité (`recipient_identity`)
+
+Les **coordonnées** rattachées à une personne. Chaque identité a un `kind` :
+
+| `kind` | Exemple de valeur | Clé de fusion ? |
+|---|---|---|
+| `app` | `baas-esport` + `membre-123` | ✅ oui (`is_key = true`) |
+| `discord` | `123456789012345678` | ✅ oui |
+| `email` | `jean@example.com` | ❌ non — **indice** |
+| `phone` | `+33…` | ❌ non — indice |
+
+> **L'email est un indice, jamais une clé**
+Plusieurs personnes peuvent partager une adresse (famille, alias générique). Le
+hub **n'utilise jamais l'email pour fusionner** deux fiches. Seules les
+identités *clés* (`app:external_id`, `discord`) sont uniques globalement et
+servent à reconnaître une personne. Ce choix évite les fusions abusives.
+
+## Comment une fiche naît : la résolution
+
+À chaque `emit`, le hub résout chaque descripteur du tableau `recipients` :
+
+```json
+{ "app_user_id": "membre-123", "email": "jean@x.fr", "discord_id": "1234…", "name": "Jean" }
+```
+
+- s'il existe déjà une personne avec l'identité clé `baas-esport:membre-123`
+  (ou ce `discord_id`), elle est **réutilisée** ;
+- sinon, une **fiche flottante** est créée et les identités y sont attachées
+  (app & Discord en clés, email en indice).
+
+Aucun envoi n'a lieu pendant la résolution : on ne fait qu'identifier/rattacher.
+
+## Le rattachement de compte (account linking)
+
+Quand le membre se connecte au hub depuis votre app, sa fiche flottante est
+**fusionnée** dans son compte hub :
+
+```text
+1. Dans votre app, le membre clique « Gérer mes notifications ».
+2. L'app le redirige vers  /api/link?token=…  (jeton signé HMAC, courte durée).
+3. Le hub vérifie le jeton, exige une session (login si besoin).
+4. claimAppIdentity() : la personne est ancrée à auth.users ; toute fiche
+   flottante portant la même identité clé est fusionnée (merge_recipients).
+5. Redirection vers /preferences — le membre voit et gère ses notifications.
+```
+
+La fusion déplace **sans perte** les identités, canaux, opt-out et historique de
+la fiche absorbée vers la fiche canonique.
+
+Voir [Souveraineté du membre](/guides/member-sovereignty) pour l'expérience
+côté membre, et [Rattachement (/link)](/api/link) pour le contrat technique du
+jeton.
+
+## Pourquoi ce modèle (héritage DataWallet)
+
+Ce graphe d'identité « personnes canoniques + identités, email-indice » est
+inspiré du modèle DataWallet de Quatools. Son intérêt :
+
+- **multi-app** : Storm, BAAS, Facturation… pointent vers la même personne ;
+- **sans friction** : un membre reçoit ses notifications dès le premier
+  événement, même sans compte ;
+- **souverain** : une fois rattaché, le membre maîtrise ses préférences sur
+  toutes les apps à la fois.
+
+
+---
+
+# Fichier : guides/channels-discord.md
+
+# Canaux Discord
+
+Le hub propose deux canaux Discord : le **webhook** (publication dans un salon)
+et le **DM** (message privé via un bot partagé).
+
+## Webhook Discord (`discord_webhook`)
+
+Publie un **embed** dans un salon. Idéal pour les notifications de gestion
+(audience `admin`) : « nouveau paiement », « équipe au complet », etc.
+
+### Configuration
+
+| Champ de config | Description |
+|---|---|
+| `webhook_url` | URL du webhook Discord du salon. |
+
+Pour obtenir l'URL : *Paramètres du salon → Intégrations → Webhooks → Nouveau
+webhook → Copier l'URL*.
+
+### Rendu
+
+L'embed est coloré selon la **catégorie** de l'événement et habillé du nom
+d'expéditeur de l'organisation (marque blanche niveau 1). Le hub gère les
+limites de débit et les délais d'attente Discord.
+
+## DM Discord (`discord_dm`)
+
+Envoie un **message privé** via le bot partagé « Notify ». Convient à
+l'audience `member` (« ton abonnement est actif ») comme à une adresse fixe
+(capitaine, admin).
+
+### Deux modes
+
+| Mode | Config | Destination |
+|---|---|---|
+| **Membre concerné** | `recipient: "member"` | Le Discord du membre fourni dans `recipients` à l'`emit`. |
+| **Adresse fixe** | `discord_user_id: "…"` | Toujours le même utilisateur. |
+
+> **Les IDs Discord sont déjà connus**
+Quand les membres se connectent à vos apps via Discord, leur identité Discord
+est déjà en base. Le mode « membre concerné » résout l'ID **à l'envoi** —
+**aucun ID n'est saisi manuellement** par l'admin.
+
+### Contraintes
+
+- Le bot et le membre doivent partager **au moins un serveur** Discord.
+- Si le membre a **bloqué les DM**, l'envoi échoue proprement (code Discord
+  `50007`) et l'exécution est marquée `failed`.
+- Mode « membre concerné » sans `recipients` → échec explicite (le hub ne
+  retombe jamais sur l'admin).
+
+### Marque blanche Discord
+
+- **Niveau 1 (actuel)** : bot neutre, embeds aux couleurs du club, surnom
+  configurable par serveur.
+- **Niveau 2 (prévu)** : *bring-your-own-bot* — un token de bot par organisation,
+  sur le même principe que le domaine d'envoi email.
+
+## Configuration & variables d'environnement
+
+Le bot requiert, côté hub :
+
+| Variable | Rôle |
+|---|---|
+| `DISCORD_BOT_TOKEN` | Token du bot (sensible). |
+| `NEXT_PUBLIC_DISCORD_APP_ID` | Id de l'application Discord (pour la carte d'invitation). |
+
+Voir aussi [Concept : Canaux](/concepts/channels).
+
+
+---
+
+# Fichier : guides/channels-email.md
+
+# Canaux Email & marque blanche
+
+L'email passe par un **SMTP générique** (Nodemailer), volontairement
+provider-agnostique : Scaleway TEM, Brevo, OVH… Aucun fournisseur n'est imposé,
+en particulier aucun fournisseur US — c'est un choix de souveraineté.
+
+## Configuration d'un canal email
+
+| Mode | Config | Destination |
+|---|---|---|
+| **Membre concerné** | `recipient: "member"` | L'email du membre fourni dans `recipients`. |
+| **Adresse fixe** | `email: "contact@club.fr"` | Toujours la même adresse. |
+
+> **Créable depuis l'interface**
+Dans `/admin` → *Canaux* → *Ajouter un canal* → *Email*, choisissez
+**« Au membre concerné »** ou **« Adresse fixe »** — exactement comme pour le MP
+Discord. Bonne pratique : créez d'abord un canal vers **votre propre adresse**
+pour tester la réception réelle avant de router vers les membres.
+
+## SMTP côté hub
+
+L'envoi s'appuie sur des variables d'environnement, communes à toutes les
+organisations :
+
+| Variable | Exemple | Rôle |
+|---|---|---|
+| `SMTP_HOST` | `smtp.tem.scaleway.com` | Serveur SMTP. |
+| `SMTP_PORT` | `465` (TLS implicite) ou `587` (STARTTLS) | Port. |
+| `SMTP_USER` / `SMTP_PASS` | … | Identifiants. |
+| `SMTP_FROM` | `Quatools Notifications <notifications@quatools.fr>` | Expéditeur par défaut. |
+
+## Fragment HTML vs document complet
+
+Pour un workflow email en `format: html` :
+
+- un **fragment** HTML est automatiquement **enveloppé** dans une mise en page de
+  marque (en-tête, pied, couleurs) ;
+- un **document complet** (`<!DOCTYPE html>…`) est envoyé **tel quel**, sans
+  habillage — pour un contrôle total du rendu.
+
+> **Terrain prêt pour la génération de templates par IA**
+Comme les documents HTML complets sont envoyés sans modification, on peut
+brancher un générateur de templates HTML par IA directement dans l'éditeur de
+workflow (chantier prévu).
+
+## Marque blanche : l'identité d'expéditeur
+
+Chaque organisation envoie sous **sa** marque. Deux niveaux :
+
+### Niveau 1 — nom & adresse de réponse
+
+Configurable immédiatement (UI `/admin/settings` ou MCP) :
+
+| Réglage | Effet |
+|---|---|
+| `sender_name` | Nom affiché de l'expéditeur. |
+| `reply_to` | Adresse de réponse. |
+
+### Niveau 2 — domaine d'envoi dédié
+
+Pour envoyer **depuis le domaine de l'organisation** (`notifications@club.fr`),
+le hub s'intègre à **Scaleway TEM** via son API :
+
+```text
+1. L'admin déclare son domaine d'envoi (POST /api/admin/settings/domain).
+2. Le hub retourne les enregistrements DNS à poser : SPF, DKIM, DMARC, MX.
+3. L'admin pose ces enregistrements chez son registrar.
+4. Vérification (check) : quand le statut passe à « verified », le From bascule
+   automatiquement sur le domaine de l'org.
+```
+
+Variables d'environnement côté hub :
+
+| Variable | Rôle |
+|---|---|
+| `SCW_SECRET_KEY` | Clé secrète IAM Scaleway (API TEM). |
+| `SCW_DEFAULT_PROJECT_ID` | Projet Scaleway. |
+| `SCW_REGION` | Région (ex. `fr-par`). |
+
+État du domaine (`domain_status`) : `unconfigured` → `pending` → `verified`
+(ou `failed`). Voir l'[API Admin](/api/admin) et les outils MCP
+`setup_sending_domain` / `check_sending_domain`.
+
+> **Bonne pratique réputation**
+Utilisez un **sous-domaine dédié** à l'envoi (ex. `hub.club.fr`) pour isoler la
+réputation d'envoi du domaine principal, sans toucher aux MX existants.
+
+
+---
+
+# Fichier : guides/mcp.md
+
+# Configuration par l'IA (MCP)
+
+Chaque organisation dispose d'un **serveur MCP** dédié. Un admin connecte
+**Claude** (ou tout client compatible MCP) et configure ses notifications **en
+langage naturel** : « crée un canal email, route l'événement abonnement vers ce
+canal avec ce message, envoie-moi un test ».
+
+## Qu'est-ce que le MCP ?
+
+Le *Model Context Protocol* est un standard ouvert qui permet à un assistant IA
+d'appeler des outils. Le hub expose un serveur MCP **par organisation** :
+
+```text
+https://hub.quatools.fr/api/mcp/{orgId}
+```
+
+Le protocole est du **JSON-RPC 2.0** sur HTTP, sécurisé par **OAuth 2.1 + PKCE**.
+
+## Se connecter
+
+### Depuis claude.ai
+
+Le serveur doit être joignable sur une **URL publique**. Dans Claude, ajoutez un
+connecteur MCP pointant vers l'URL de votre organisation. Le flux OAuth vérifie
+que vous êtes **admin actif** de l'org avant d'émettre un jeton d'accès.
+
+La carte « Connexion MCP » de l'écran *Paramètres* du hub affiche l'URL exacte
+de votre organisation et les étapes de connexion.
+
+### Depuis Claude Code (dev)
+
+```bash
+claude mcp add --transport http hub-notif https://hub.quatools.fr/api/mcp/<orgId>
+```
+
+## Les 15 outils disponibles
+
+### Événements
+- **`list_events`** — liste les événements actifs, leurs variables de template
+  et le nombre de workflows actifs par événement.
+
+### Canaux
+- **`list_channels`** — canaux de l'org avec leur statut de vérification.
+- **`create_channel`** — crée un webhook, un DM ou un email.
+- **`update_channel`** — modifie label, destination, activation (re-vérifie si
+  la destination change).
+- **`delete_channel`** — supprime (⚠️ cascade sur les workflows).
+
+### Workflows
+- **`list_workflows`** — routes configurées (événement → canal + message), avec
+  statut actif/inactif.
+- **`create_workflow`** — relie un événement à un canal avec un message.
+- **`update_workflow`** — modifie le message (sujet, corps, format) ou
+  l'activation.
+- **`delete_workflow`** — supprime une route.
+- **`test_workflow`** — envoie un test avec des données d'exemple (et une
+  adresse de surcharge optionnelle).
+
+### Logs
+- **`get_logs`** — historique des envois (statut `sent`/`failed`, erreurs,
+  contenu).
+
+### Marque blanche
+- **`get_sender_identity`** — identité d'expéditeur (nom, adresse de réponse,
+  domaine et son statut).
+- **`set_sender_identity`** — définit le nom d'expéditeur et l'adresse de réponse.
+- **`setup_sending_domain`** — déclare un domaine d'envoi, retourne les
+  enregistrements DNS à poser.
+- **`check_sending_domain`** — rafraîchit la vérification DNS et retourne le
+  statut (`pending`, `verified`, `failed`).
+
+## Sécurité
+
+| Variable d'environnement | Rôle |
+|---|---|
+| `MCP_OAUTH_SECRET` | Secret de signature des jetons d'accès OAuth (≥ 32 caractères). |
+
+Le jeton porte l'`userId` et l'`orgId` : un admin ne peut piloter **que** les
+organisations dont il est admin. Voir aussi la [Référence API](/api/overview).
+
+## Exemple de conversation
+
+> **Admin :** « Crée un canal email "membre concerné" et route
+> `baas.subscription.created` dessus, avec le message : Bienvenue
+> {{member_name}}, ton abonnement {{plan_name}} est actif ! Puis envoie-moi un
+> test. »
+>
+> **Claude** appelle `create_channel`, `create_workflow`, puis `test_workflow`
+> et confirme l'envoi — sans que l'admin n'ouvre l'interface.
+
+
+---
+
+# Fichier : guides/member-sovereignty.md
+
+# Souveraineté du membre
+
+> **Vos notifications, votre vie, vos choix.**
+
+La promesse du hub : la personne notifiée **possède** ses préférences. Pas
+l'application qui déclenche l'événement, pas l'organisation — la personne. Ce
+guide décrit l'expérience côté membre et les garanties techniques derrière.
+
+## Ce que le membre peut faire
+
+| Action | Où | Effet |
+|---|---|---|
+| **Voir** ce qu'il reçoit | *Mes notifications* | Liste des notifications d'audience `member`, groupées par événement. |
+| **Refuser** une notification | *Mes notifications* (toggle) | Opt-out par canal et par événement. |
+| **Rediriger** vers ses canaux | *Mes canaux de réception* | Ajout d'emails / DM Discord personnels. |
+| **Consulter l'historique** | *Historique* | Chaque notif reçue, son statut, sa date et **où** elle a été livrée. |
+
+## Accessible même sans être admin
+
+L'espace préférences (`/preferences`) est accessible à **tout membre**, pas
+seulement aux admins. Les organisations qui s'affichent pour un membre sont
+**déduites de son activité** (les notifications qu'il a reçues) — un simple
+joueur voit donc ses préférences sans aucun rôle d'administration.
+
+## La transparence de l'historique
+
+L'historique ne dit pas seulement « envoyé » : il dit **où**. « Envoyé à votre
+email », « Envoyé à votre Discord », « Publié dans un salon ». Le membre sait
+exactement quelle de ses coordonnées a reçu quoi — y compris quand une
+notification a été **redirigée**.
+
+## Les garanties techniques
+
+Cette souveraineté repose sur la couche
+[destinataires & identités](/concepts/recipients-identity) :
+
+1. **Une fiche par personne**, indépendante de l'app émettrice.
+2. **Opt-out par destinataire** (`recipient_id`), pas par compte applicatif :
+   un refus vaut pour la personne, sur toutes les apps qui la notifient.
+3. **Un canal « membre concerné » ne retombe jamais sur un tiers** : sans
+   destinataire explicite, le hub échoue plutôt que de livrer au mauvais
+   endroit.
+4. **Rattachement réversible et sans perte** : quand le membre réclame sa fiche,
+   identités, canaux, opt-out et historique sont fusionnés proprement.
+
+## Le rattachement de compte
+
+Pour passer d'une fiche flottante (créée par les `emit`) à des préférences
+contrôlées, le membre **rattache son compte** :
+
+```text
+App partenaire → /api/link?token=… → login hub → claimAppIdentity → /preferences
+```
+
+Détail technique : [Rattachement (/link)](/api/link).
+
+## Sur la feuille de route
+
+- **Désabonnement 1-clic** + en-tête `List-Unsubscribe` sur les emails.
+- **Login par lien magique** (en plus de Discord OAuth).
+- **Reroute effectif** : brancher les canaux personnels du membre dans le
+  routage (remplacer ou ajouter à la destination par défaut).
+- **Landing de rattachement** pédagogique en marque blanche pour les arrivées
+  via deep-link partenaire.
+
+
+---
+
+# Fichier : api/overview.md
+
+# Référence API — vue d'ensemble
+
+Le hub expose trois familles d'API :
+
+| Famille | Authentification | Pour qui |
+|---|---|---|
+| **Serveur-à-serveur** (`/api/notifications/*`) | Clé API (Bearer) | Vos applications |
+| **Admin** (`/api/admin/*`) | Session + rôle admin de l'org | L'UI admin (et le MCP) |
+| **Membre** (`/api/user/*`) | Session utilisateur | L'espace préférences |
+
+Plus deux briques transverses : le **rattachement** (`/api/link`) et l'**OAuth
+2.1** du serveur MCP (`/api/oauth/*`, `/api/mcp/{orgId}`).
+
+## URL de base
+
+```text
+Production : https://hub.quatools.fr
+```
+
+## Authentification serveur-à-serveur
+
+Les API utilisées par vos applications (`register`, `emit`) s'authentifient par
+**clé API** dans l'en-tête `Authorization` :
+
+```http
+Authorization: Bearer <VOTRE_API_KEY>
+```
+
+La clé doit correspondre à une entrée de la variable d'environnement
+`NOTIFICATION_API_KEYS` du hub, au format JSON `{"nom-app": "secret"}`. Le nom
+d'app associé à la clé est utilisé comme préfixe d'identité dans le
+[graphe d'identité](/concepts/recipients-identity).
+
+## Authentification admin & membre
+
+Les API `/api/admin/*` et `/api/user/*` s'appuient sur la **session Supabase**
+(cookie). Les routes admin vérifient en plus que l'utilisateur est **admin
+actif** de l'organisation ciblée. Elles sont surtout consommées par l'UI du hub
+et par le serveur MCP — vos applications n'ont normalement pas à les appeler.
+
+## Codes d'erreur communs
+
+| Code | Signification |
+|---|---|
+| `400` | Body invalide (champ requis manquant). |
+| `401` | Clé API ou session invalide / manquante. |
+| `403` | Authentifié mais pas admin de l'organisation. |
+| `404` | Ressource inconnue (événement inactif, etc.). |
+| `500` | Erreur interne. |
+
+## Pages de référence
+
+- [POST /register](/api/register) — déclarer ses événements
+- [POST /orgs](/api/orgs) — déclarer une organisation (apps tierces)
+- [POST /emit](/api/emit) — émettre une notification
+- [API Admin](/api/admin) — canaux, workflows, logs, marque blanche
+- [API Membre](/api/user) — opt-out, canaux perso, historique
+- [Rattachement (/link)](/api/link) — jeton de rattachement de compte
+
+
+---
+
+# Fichier : api/register.md
+
+# POST /api/notifications/register
+
+Déclare (ou met à jour) les événements qu'une application sait émettre.
+C'est un **upsert** par `slug` : ré-appeler avec un slug existant met
+l'événement à jour.
+
+> **Aucune migration, aucun déploiement du hub**
+Déclarer ou modifier des événements **et leurs variables** se fait **uniquement**
+par cet appel `/register` — **jamais** par une migration SQL ou un déploiement
+côté hub. Le `payload_schema` est un champ JSON souple et **purement documentaire** :
+émettre une nouvelle variable la rend telle quelle (aucune validation), et la
+re-déclarer ici la fait simplement apparaître à l'admin dans l'éditeur de message.
+Les migrations SQL du dépôt ne concernent **que la structure interne du hub**,
+jamais vos événements ou vos variables.
+
+## Quand l'appeler
+
+- au démarrage de l'application, ou via un script de seed ;
+- à chaque ajout ou modification d'événement.
+
+## Requête
+
+```http
+POST /api/notifications/register
+Authorization: Bearer <API_KEY>
+Content-Type: application/json
+```
+
+```json
+{
+  "events": [
+    {
+      "slug": "baas.subscription.created",
+      "label": "Nouvel abonnement",
+      "description": "Un membre vient de souscrire à un abonnement",
+      "category": "billing",
+      "supported_channels": ["email", "discord_webhook", "discord_dm"],
+      "audiences": ["admin", "member"],
+      "default_active": true,
+      "payload_schema": {
+        "member_name": "string",
+        "plan_name": "string",
+        "amount": "number",
+        "club_name": "string"
+      }
+    }
+  ]
+}
+```
+
+> **L'app est déduite de votre clé API**
+Pas besoin d'un champ `app` au niveau racine : le hub identifie votre application
+via la **clé API** (`Bearer`), et vos événements ne peuvent appartenir qu'à elle.
+Un `app` éventuel dans le body est **ignoré** (cohérent avec `/orgs` et `/emit`).
+
+## Champs d'un événement
+
+| Champ | Type | Requis | Description |
+|---|---|---|---|
+| `slug` | string | ✅ | Identifiant unique `app.categorie.action`. |
+| `label` | string | ✅ | Nom affiché dans l'UI admin. |
+| `description` | string | — | Description détaillée. |
+| `category` | string | ✅ | Regroupement. Valeurs reconnues par l'admin : `billing`, `member`, `team`, `shop`, `system`. Une autre valeur reste valide mais s'affiche sous « Autre ». |
+| `supported_channels` | string[] | ✅ | `email`, `discord_webhook`, `discord_dm`. |
+| `audiences` | string[] | ✅ | `admin`, `member`. Voir [Audiences](/concepts/audiences). |
+| `default_active` | boolean | — | Défaut `false`. |
+| `payload_schema` | object | — | Variables `{ "clé": "type" }` (documentaire). |
+
+## Réponse `200`
+
+```json
+{
+  "registered": 1,
+  "updated": 0,
+  "new": 1
+}
+```
+
+| Champ | Description |
+|---|---|
+| `registered` | Nombre total d'événements traités. |
+| `new` | Nombre de nouveaux événements créés. |
+| `updated` | Nombre d'événements mis à jour. |
+
+## Erreurs
+
+| Code | Cause |
+|---|---|
+| `401` | Clé API invalide ou manquante. |
+| `400` | `events` manquant/vide, ou un event sans `slug`/`label`/`category`/`supported_channels`/`audiences`. |
+| `409` | Un `slug` est déjà déclaré par une autre application. |
+
+> **Voir aussi**
+[Concept : Événements](/concepts/events) pour la convention de nommage et le
+rôle exact du `payload_schema`.
+
+
+---
+
+# Fichier : api/orgs.md
+
+# Déclarer une organisation (`/api/notifications/orgs`)
+
+Une **organisation** est l'espace auquel se rattachent vos destinataires et votre
+configuration (canaux, workflows) — un club, une équipe, un tenant… Déclarez
+chacune des vôtres via cet endpoint : le hub crée une organisation **qu'il
+possède** et renvoie son `org_id` (UUID), que vous utilisez ensuite dans vos
+[`emit`](/api/emit). C'est **idempotent** par `external_id` (voir [plus bas](#idempotence)).
+
+## Requête
+
+```http
+POST /api/notifications/orgs
+Authorization: Bearer <API_KEY>
+Content-Type: application/json
+```
+
+```json
+{
+  "external_id": "votre-id-interne",
+  "name": "Nom affiché de l'organisation",
+  "slug": "slug-optionnel"
+}
+```
+
+| Champ | Requis | Description |
+|---|---|---|
+| `name` | ✅ | Nom affiché (UTF-8). |
+| `external_id` | — | Votre identifiant interne. **Recommandé** : rend l'appel idempotent. |
+| `slug` | — | Slug d'affichage optionnel. |
+
+## Réponse
+
+```json
+{ "org_id": "8f3c…-uuid", "created": true }
+```
+
+| Champ | Description |
+|---|---|
+| `org_id` | **L'UUID à utiliser dans vos `emit`.** Stockez-le côté app. |
+| `created` | `true` si créée, `false` si elle existait déjà (mise à jour du nom/slug). |
+
+## Idempotence
+
+Avec `external_id`, ré-appeler l'endpoint **met à jour** le nom/slug sans créer
+de doublon et renvoie le **même `org_id`** (`created: false`). Vous pouvez donc
+appeler `/orgs` à chaque démarrage de votre app sans risque.
+
+> **Cloisonnement par app**
+Une organisation appartient à l'**app de la clé API** (jamais au body). Une app
+ne peut ni voir ni modifier les organisations d'une autre.
+
+## Et ensuite ? Donner accès à un administrateur
+
+Créer l'organisation ne donne de droits à personne. Pour qu'un humain puisse la
+configurer (canaux, workflows) dans `/admin`, l'app le **vouche** via un
+[lien admin](/api/link#lien-admin-octroi-de-droits).
+
+## Parcours complet d'une app tierce
+
+1. [`/register`](/api/register) — déclarer ses événements.
+2. **`/orgs`** — déclarer une organisation → obtenir `org_id`.
+3. [Lien admin](/api/link#lien-admin-octroi-de-droits) — donner les droits à un admin humain.
+4. [`/emit`](/api/emit) — émettre avec cet `org_id`.
+
+
+---
+
+# Fichier : api/emit.md
+
+# POST /api/notifications/emit
+
+Émet un événement. Le hub résout les workflows actifs, identifie les
+destinataires, applique les opt-out, rend les templates et dispatche sur chaque
+canal.
+
+> **Réponse immédiate, envoi en arrière-plan**
+`emit` crée les exécutions puis **répond sans attendre** l'envoi réel
+(SMTP/Discord peuvent être lents et faire expirer votre `fetch`). Le dispatch se
+termine après la réponse HTTP. Le champ `dispatched` compte les exécutions
+**créées**, pas les envois confirmés — consultez l'[historique](/api/user) ou
+les logs admin pour le statut final.
+
+## Requête
+
+```http
+POST /api/notifications/emit
+Authorization: Bearer <API_KEY>
+Content-Type: application/json
+```
+
+```json
+{
+  "event": "baas.subscription.created",
+  "org_id": "uuid-de-l-organisation",
+  "recipients": [
+    {
+      "app_user_id": "membre-123",
+      "email": "jean@example.com",
+      "discord_id": "123456789012345678",
+      "name": "Jean Dupont"
+    }
+  ],
+  "payload": {
+    "member_name": "Jean Dupont",
+    "plan_name": "Premium",
+    "amount": 29.99,
+    "club_name": "Team Esport Lyon"
+  }
+}
+```
+
+## Champs
+
+| Champ | Type | Requis | Description |
+|---|---|---|---|
+| `event` | string | ✅ | Slug de l'événement (doit être enregistré et actif). |
+| `org_id` | string | ✅ | UUID de l'organisation. |
+| `payload` | object | ✅ | Données de l'événement, injectées dans les templates `{{variable}}`. |
+| `recipients` | object[] | — | Descripteurs des destinataires concernés (voir ci-dessous). Requis pour livrer « au membre concerné ». |
+| `target_users` | string[] | — | *Legacy* : ids `auth.users` ciblés. Conservé pour rétrocompatibilité ; préférez `recipients`. |
+
+### Descripteur de destinataire (`recipients[]`)
+
+| Champ | Type | Description |
+|---|---|---|
+| `app_user_id` | string | Id du membre côté app (clé d'identité). |
+| `email` | string | Email du membre (indice). |
+| `discord_id` | string | Snowflake Discord du membre (clé d'identité). |
+| `name` | string | Nom affiché. |
+
+Le hub enregistre ces coordonnées sur une **fiche destinataire canonique**,
+rattachable ensuite au compte du membre. Voir
+[Destinataires & identités](/concepts/recipients-identity).
+
+## Réponse `200`
+
+```json
+{
+  "dispatched": 2,
+  "channels": ["discord_dm", "email"],
+  "execution_ids": ["uuid-exec-1", "uuid-exec-2"]
+}
+```
+
+| Champ | Description |
+|---|---|
+| `dispatched` | Nombre d'exécutions créées (≈ envois lancés). |
+| `channels` | Types de canaux concernés. |
+| `execution_ids` | Ids des exécutions, pour le suivi/debug. |
+
+Si aucun workflow actif n'existe pour l'événement/org, `dispatched` vaut `0`
+(et la réponse reste `200`).
+
+## Comportements importants
+
+### Canal « membre concerné » sans destinataire → échec explicite
+
+Si un workflow utilise un canal `recipient: "member"` mais que l'`emit` ne
+fournit **aucun** `recipients`, le hub **ne retombe pas** sur l'admin :
+l'exécution est créée puis marquée `failed` avec un message clair. Corrigez
+votre `emit` en ajoutant le descripteur. Voir [Canaux](/concepts/channels).
+
+### Opt-out par destinataire
+
+Avant l'envoi, le hub écarte les livraisons « membre » pour lesquelles le
+destinataire a posé un opt-out sur ce workflow. Les diffusions d'org (webhook)
+ne sont pas concernées.
+
+## Erreurs
+
+| Code | Cause |
+|---|---|
+| `401` | Clé API invalide ou manquante. |
+| `400` | `event`, `org_id` ou `payload` manquant/invalide ; `recipients`/`target_users` non-tableau ou > 500. |
+| `403` | App en essai au plafond atteint, bloquée par l'opérateur, ou événement hors du périmètre de la clé. |
+| `404` | Événement inconnu, inactif ou déprécié. |
+| `500` | Erreur interne. |
+
+
+---
+
+# Fichier : api/admin.md
+
+# API Admin
+
+Les routes `/api/admin/*` pilotent la configuration d'une organisation : canaux,
+workflows, logs et identité d'expéditeur. Elles sont consommées par l'**UI
+admin** du hub et par le **serveur MCP** ; vos applications n'ont normalement
+pas à les appeler directement.
+
+> **Authentification**
+Session Supabase (cookie) **+** rôle admin actif de l'organisation. Toutes les
+routes prennent `org_id` (query ou body) et renvoient `403` si l'utilisateur
+n'est pas admin de cette org. Pour piloter ces actions en langage naturel, voir
+[Configuration par l'IA (MCP)](/guides/mcp).
+
+## Événements
+
+| Méthode & route | Rôle |
+|---|---|
+| `GET /api/admin/events?org_id=…` | Catalogue des événements actifs (avec nb. de workflows). |
+
+## Canaux
+
+| Méthode & route | Rôle |
+|---|---|
+| `GET /api/admin/channels?org_id=…` | Liste les canaux de l'org. |
+| `POST /api/admin/channels` | Crée un canal (webhook, DM, email). |
+| `PATCH /api/admin/channels/{id}` | Modifie label, destination, activation. |
+| `DELETE /api/admin/channels/{id}` | Supprime (cascade sur les workflows). |
+
+## Workflows
+
+| Méthode & route | Rôle |
+|---|---|
+| `GET /api/admin/workflows?org_id=…` | Workflows groupés par événement. |
+| `POST /api/admin/workflows` | Crée une route (événement + canal + message). |
+| `PATCH /api/admin/workflows/{id}` | Modifie message (sujet/corps/format) ou activation. |
+| `DELETE /api/admin/workflows/{id}` | Supprime la route. |
+| `POST /api/admin/workflows/{id}/test` | Envoie un test (données d'exemple, `is_test = true`). |
+
+## Logs
+
+| Méthode & route | Rôle |
+|---|---|
+| `GET /api/admin/logs?org_id=…&status=…&limit=…` | Historique des exécutions (sent/failed, erreur, contenu). |
+
+## Identité d'expéditeur (marque blanche)
+
+| Méthode & route | Rôle |
+|---|---|
+| `GET /api/admin/settings?org_id=…` | Identité d'expéditeur et statut du domaine. |
+| `PATCH /api/admin/settings` | Définit nom d'expéditeur et adresse de réponse. |
+| `POST /api/admin/settings/domain` | Configure / vérifie un domaine d'envoi (SPF/DKIM/DMARC). |
+
+Voir [Email & marque blanche](/guides/channels-email) pour le détail du domaine
+d'envoi.
+
+
+---
+
+# Fichier : api/user.md
+
+# API Membre
+
+Les routes `/api/user/*` servent l'espace **préférences** du membre. Elles
+s'authentifient par la **session** de l'utilisateur connecté. Un membre n'a pas
+besoin d'être admin : son accès se déduit de son activité (les organisations qui
+lui ont envoyé des notifications).
+
+## Opt-out (mes notifications)
+
+| Méthode & route | Rôle |
+|---|---|
+| `GET /api/user/optouts?org_id=…` | Workflows d'audience `member` pour cette org, avec l'état d'opt-out. |
+| `PUT /api/user/optouts` | Active/désactive l'opt-out pour un workflow. |
+
+L'opt-out est posé sur la **fiche destinataire** (`recipient_id`) du membre : il
+ne reçoit plus les livraisons « membre concerné » de ce workflow. Les diffusions
+d'org (webhooks) ne sont pas concernées. Voir [Audiences](/concepts/audiences).
+
+## Canaux personnels (mes canaux de réception)
+
+| Méthode & route | Rôle |
+|---|---|
+| `GET /api/user/channels?org_id=…` | Canaux personnels du membre. |
+| `POST /api/user/channels` | Ajoute un canal personnel (email, DM Discord). |
+| `PATCH /api/user/channels/{id}` | Modifie un canal personnel. |
+| `DELETE /api/user/channels/{id}` | Supprime un canal personnel. |
+
+Ces canaux ont `org_id = null` : ils appartiennent au membre, pas à
+l'organisation.
+
+## Historique (mes notifications reçues)
+
+| Méthode & route | Rôle |
+|---|---|
+| `GET /api/user/history?org_id=…` | Exécutions adressées au membre, avec la **destination réelle**. |
+
+L'historique affiche, pour chaque notification : l'événement, le statut, la date
+et **où** elle a été livrée (« envoyé à votre email / votre Discord / un salon »)
+— la transparence promise par le hub.
+
+## Clubs / organisations accessibles
+
+| Méthode & route | Rôle |
+|---|---|
+| `GET /api/auth/clubs` | Organisations où l'utilisateur est admin **et** celles déduites de son activité de membre. |
+
+Cette route alimente le sélecteur d'organisation, aussi bien pour un admin que
+pour un simple membre.
+
+
+---
+
+# Fichier : api/link.md
+
+# Rattachement de compte (`/api/link`)
+
+Le rattachement relie une **fiche destinataire** (créée par vos `emit`) au
+**compte hub** du membre quand il se connecte. Cela transforme une fiche
+flottante en préférences que le membre possède et contrôle.
+
+Concept détaillé : [Destinataires & identités](/concepts/recipients-identity).
+
+## Le flux
+
+```text
+1. Dans votre app, le membre clique « Gérer mes notifications ».
+2. L'app génère un jeton signé et redirige vers :
+      https://hub.quatools.fr/api/link?token=<JETON>
+3. Le hub vérifie le jeton. Si pas de session hub → login (Discord OAuth),
+   puis reprise du flux.
+4. claimAppIdentity() ancre la personne à auth.users et fusionne toute fiche
+   flottante portant la même identité clé.
+5. Redirection vers /preferences?linked=1.
+```
+
+## Le jeton de rattachement
+
+Le jeton est signé en **HMAC-SHA256** avec le **secret de signature de l'app**,
+et porte une **courte durée de validité** (≈ 2 min) pour éviter le rejeu et
+l'usurpation d'identité.
+
+Le secret de signature dépend du type d'app :
+- **app self-service** (créée dans l'espace développeur) : le **`signing_secret`**
+  dédié, affiché dans l'encart d'intégration (distinct de la clé API) ;
+- **app historique** (clé en environnement) : la **clé API** fait office de secret.
+
+Charge utile typique :
+
+| Champ | Description |
+|---|---|
+| `app` | **Slug** de l'app émettrice (ex. `baas-esport`) — **pas** le nom affiché ni l'UUID de l'URL `/developer/<uuid>`. |
+| `app_user_id` | Id du membre côté app. |
+| `org_id` | Organisation concernée. |
+| `discord_id`, `email`, `name` | Coordonnées connues (optionnelles). |
+| `exp` | Expiration courte. |
+
+> **Quel secret pour signer ?**
+Signez avec le **`signing_secret`** de votre app self-service (**pas** la clé API,
+qui sert au `Bearer` d'`emit`). Pour une app historique (clé en environnement),
+c'est la clé API qui fait office de secret. Toujours **côté serveur**, jamais
+côté client.
+
+### Forger le jeton (Node.js)
+
+Le jeton est `base64url(payload).base64url(hmac)` :
+
+```typescript
+import { createHmac } from 'crypto'
+
+/** secret = NOTIFICATION_SIGNING_SECRET (app self-service). */
+function mintLinkToken(payload: Record<string, unknown>, secret: string): string {
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url')
+  const sig = createHmac('sha256', secret).update(body).digest('base64url')
+  return `${body}.${sig}`
+}
+
+// Rattachement membre — rediriger l'utilisateur vers le lien obtenu.
+const token = mintLinkToken(
+  {
+    app: 'storm',
+    app_user_id: 'membre-123',
+    org_id: '<org_id>',
+    email: 'jean@example.com',
+    exp: Math.floor(Date.now() / 1000) + 120, // 2 min
+  },
+  process.env.NOTIFICATION_SIGNING_SECRET!,
+)
+// → https://hub.quatools.fr/api/link?token=${token}
+```
+
+Pour un **lien admin**, ajoutez `scope: "admin"` au payload et redirigez vers
+`/api/link-admin` (voir ci-dessous).
+
+## Paramètres de la requête
+
+| Paramètre | Description |
+|---|---|
+| `token` | Le jeton signé. **Requis.** |
+
+## Comportement
+
+- **Jeton valide + session présente** → fiche réclamée/fusionnée, redirection
+  vers `/preferences`.
+- **Jeton valide + pas de session** → redirection vers le login avec `next`
+  préservé, puis reprise.
+- **Jeton invalide ou expiré** → erreur, aucune fiche modifiée.
+
+## Lien admin (octroi de droits)
+
+Le même mécanisme de jeton sert à **donner les droits d'administration** d'une
+organisation hub (créée via [`/orgs`](/api/orgs)) à un utilisateur — utile pour
+les applications tierces dont les organisations ne sont pas des clubs esport.
+
+Le jeton porte alors `scope: "admin"` et l'`org_id` ciblé :
+
+| Champ | Description |
+|---|---|
+| `app` | **Slug** de l'app (doit **posséder** l'org). |
+| `app_user_id` | Id de l'admin côté app. |
+| `scope` | `"admin"`. |
+| `org_id` | L'organisation à administrer. |
+| `name`, `email`, `discord_id` | Optionnels. |
+| `exp` | Expiration courte. |
+
+L'app redirige l'admin qu'elle vouche vers :
+
+```text
+https://hub.quatools.fr/api/link-admin?token=<JETON>
+```
+
+Le hub vérifie la signature, **que l'org appartient bien à l'app** qui signe
+(anti-usurpation inter-app), exige une session hub (login si besoin), puis
+enregistre l'utilisateur comme **admin de l'org**. Redirection vers
+`/admin?org=<org_id>`, où il configure canaux et workflows comme pour un club.
+
+> **Idempotent**
+Ré-ouvrir le lien ne crée pas de doublon : l'utilisateur reste simplement admin.
+
+> **Rôles & équipe**
+Le **premier** admin à réclamer une org en devient **propriétaire** (`owner`) ;
+les suivants sont **`admin`**. Le propriétaire peut ensuite **inviter, promouvoir
+ou retirer** des membres depuis le hub (page **Équipe**) — vous n'avez rien à
+implémenter côté app pour ça. Ces droits sont **propres au hub** (gérer les
+notifications), distincts des droits de votre propre plateforme.
+
+## Page de rattachement (à venir)
+
+Une **landing de rattachement** pédagogique en marque blanche est prévue pour
+remplacer le login générique lorsqu'on arrive via un deep-link partenaire :
+elle expliquera au membre que son partenaire s'associe au hub pour lui offrir la
+**maîtrise de ses notifications** (« Vos notifications, votre vie, vos choix »).
+
+
+---
+
+# Fichier : architecture/data-model.md
+
+# Modèle de données
+
+Tout vit dans le schéma PostgreSQL **`notifications`** (Supabase), aux côtés de
+`auth.users` (partagé avec les applications). RLS activé sur toutes les tables.
+
+## Schéma relationnel
+
+```text
+auth.users
+   │
+   ├──< channels (user_id)            canaux perso/org
+   ├──< workflows (created_by)        créateur du workflow
+   ├──< user_optouts (user_id)        opt-out (legacy)
+   └──1 recipients (auth_user_id)     fiche réclamée (1:1)
+
+events ──< workflows ──< workflow_steps          (event → route → message)
+              │   │
+              │   └──< workflow_executions        (trace des envois)
+              └──> channels (channel_id)          (destination de la route)
+
+recipients ──< recipient_identities              (graphe d'identité)
+     │       ──< user_optouts (recipient_id)      (opt-out par destinataire)
+     │       ──< workflow_executions (recipient_id)
+     └──< channels (recipient_id)                 (transitionnel)
+
+org_settings (org_id)                              (marque blanche)
+```
+
+## Les tables
+
+### Routage
+
+| Table | Rôle | Colonnes clés |
+|---|---|---|
+| `events` | Catalogue déclaré par les apps | `app`, `slug` (unique), `category`, `supported_channels[]`, `audiences[]`, `payload_schema`, `is_active`, `deprecated_at` |
+| `channels` | Destinations | `user_id`, `org_id` (null = perso), `type`, `config` (jsonb), `is_verified`, `is_active`, `recipient_id` |
+| `workflows` | Routes (event + canal) par org | `org_id`, `event_id`, `channel_id`, `is_active`, `created_by` |
+| `workflow_steps` | Message d'une route | `workflow_id`, `step_order`, `step_type`, `subject`, `body`, `format` |
+| `workflow_executions` | Trace de chaque envoi | `event_slug`, `channel_id`, `user_id`, `recipient_id`, `org_id`, `status`, `payload`, `rendered_content`, `destination`, `error_message`, `is_test`, `sent_at` |
+
+### Destinataires & identités (CDC v2)
+
+| Table | Rôle | Colonnes clés |
+|---|---|---|
+| `recipients` | Personne canonique | `auth_user_id` (unique, nullable), `is_claimed`, `display_name`, `locale` |
+| `recipient_identities` | Coordonnées d'une personne | `recipient_id`, `kind` (`app`/`discord`/`email`/`phone`), `app`, `value`, `is_key` |
+
+> **Unicité des identités clés uniquement**
+Seules les identités **clés** (`is_key = true` : `app`, `discord`) ont une
+contrainte d'unicité globale (`(kind, app, value) WHERE is_key`). Les emails et
+téléphones (`is_key = false`) peuvent être partagés — ce sont des indices, pas
+des clés de fusion. Voir [Destinataires & identités](/concepts/recipients-identity).
+
+### Préférences & marque blanche
+
+| Table | Rôle | Colonnes clés |
+|---|---|---|
+| `user_optouts` | Refus d'un workflow | `user_id` (legacy), `recipient_id` (CDC v2), `workflow_id` |
+| `org_settings` | Identité d'expéditeur par org | `org_id` (PK), `sender_name`, `reply_to`, `sender_domain`, `sender_local_part`, `domain_status`, `domain_dns_records` |
+
+### Organisations & droits (hub)
+
+| Table | Rôle | Colonnes clés |
+|---|---|---|
+| `organizations` | Organisations **possédées par le hub** (apps tierces) | `id` (= l'`org_id`), `app`, `external_id`, `name`, `slug`, `source` ; unique `(app, external_id)` |
+| `org_admins` | Droits d'admin sur une org hub | `org_id`, `auth_user_id`, `role` ; unique `(org_id, auth_user_id)` |
+
+> **Union avec le BAAS, sans migration**
+Les droits et noms d'organisation sont résolus en **union** de deux sources :
+les clubs du BAAS (`public.clubs` / `public.club_admins`) **et** ces tables hub.
+Aucune donnée BAAS n'est déplacée : une app comme Storm a ses propres
+organisations sans toucher au BAAS. Les `org_id` sont des UUID → aucune collision
+entre les deux sources. Voir [`/orgs`](/api/orgs) et le
+[lien admin](/api/link#lien-admin-octroi-de-droits).
+
+## Fonctions notables
+
+| Fonction | Rôle |
+|---|---|
+| `discord_id_for_user(uuid)` | Résout le snowflake Discord depuis `auth.identities` (SECURITY DEFINER). |
+| `merge_recipients(keep, drop)` | Fusionne deux fiches sans perte (identités, canaux, opt-out, exécutions). |
+| `set_updated_at()` | Trigger d'horodatage sur toutes les tables. |
+
+## RLS & accès en bref
+
+Depuis le durcissement (migration `013`), **aucun rôle `anon`/`authenticated`
+n'a d'accès direct** aux tables du schéma `notifications` : tout passe par le
+**service role**, côté serveur, via les routes `/api/*`. Le client navigateur ne
+sert qu'à l'**authentification** (schéma `auth`). Les policies RLS subsistent en
+défense en profondeur. Les tables `organizations` et `org_admins` suivent la
+même règle : service role uniquement.
+
+> **Invariant**
+Le front n'accède **jamais** aux tables `notifications` en direct. Verrouiller
+ces tables est donc sans impact fonctionnel — et coupe tout accès inter-tenant.
+
+## Migrations
+
+Les migrations vivent dans `supabase/migrations/` (de `001` à `015`) : schéma
+initial, seeds d'exemple, identité d'expéditeur, support DM Discord, résolveur
+Discord, recipients/identités (CDC v2), fusion, destination d'exécution,
+préférences membre, désabonnement, **durcissement RLS (`013`)** et
+**organisations propres au hub (`015`)**.
+
+> **Seeds d'exemple**
+Les migrations `002`/`003` *seedent* des événements `baas.*` (esport) à titre
+d'exemple. Dans un autre contexte, déclarez vos propres événements via
+[`/register`](/api/register) plutôt que de réutiliser ces seeds.
+
+
+---
+
+# Fichier : architecture/emit-flow.md
+
+# Flux d'émission
+
+Ce que fait exactement le hub entre l'appel `POST /api/notifications/emit` et la
+livraison. Référence du contrat : [POST /emit](/api/emit).
+
+## Vue d'ensemble
+
+```text
+emit ──▶ [1] Auth clé API
+         [2] Validation (event, org_id, payload)
+         [3] Résolution de l'événement (actif, non déprécié)
+         [4] Résolution des destinataires (recipients[] → fiches canoniques)
+         [5] Résolution des routes (workflows actifs de l'org pour l'event)
+         [6] Identité d'expéditeur de l'org (marque blanche)
+         [7] Construction des jobs de livraison
+         [8] Filtre opt-out + création des exécutions (pending)
+         ──▶ RÉPONSE HTTP { dispatched, channels, execution_ids }
+         [9] Dispatch en arrière-plan (non attendu) → sent / failed
+```
+
+## Étape par étape
+
+### 1–3. Auth, validation, événement
+La clé API est validée et associée à un **nom d'app** (préfixe d'identité).
+`event`, `org_id` et `payload` sont requis. L'événement doit être **actif** et
+**non déprécié**, sinon `404`.
+
+### 4. Résolution des destinataires
+Chaque entrée de `recipients[]` est résolue en **fiche canonique** via
+`resolveRecipient` : réutilisation si une identité clé correspond, sinon création
+d'une fiche flottante. **Aucun envoi** ici — uniquement de l'identification.
+
+### 5. Résolution des routes
+`resolveRoutes` retourne tous les **workflows actifs** de l'org pour cet
+événement, avec leur canal et leur message. Zéro route → réponse `dispatched: 0`.
+
+### 6. Identité d'expéditeur
+`getSenderIdentity(org_id)` charge le nom d'expéditeur, l'adresse de réponse et
+le domaine d'envoi (marque blanche) appliqués aux livraisons.
+
+### 7. Construction des jobs
+Pour chaque route, selon `config.recipient` :
+
+- **`member`** : un job **par destinataire** résolu, sur **son** identité
+  (Discord/email). Si aucun destinataire → un job marqué pour **échec explicite**
+  (le hub ne retombe jamais sur l'admin).
+- **adresse fixe / webhook** : un seul job, destinataire = créateur du workflow.
+
+La destination concrète (email, snowflake Discord) est figée dans le job pour
+l'historique.
+
+### 8. Opt-out & exécutions
+Les opt-out des destinataires **membre** sont chargés ; les jobs refusés sont
+écartés (les diffusions webhook ne sont pas concernées). Pour chaque job
+restant, une **exécution** est créée en statut `pending` avec sa `destination`.
+
+### Réponse immédiate
+Le hub répond **dès les exécutions créées**, sans attendre l'envoi réel — ce qui
+évite les timeouts côté appelant. `dispatched` = nombre d'exécutions créées.
+
+### 9. Dispatch en arrière-plan
+Le hub étant un serveur Node persistant, les promesses d'envoi continuent après
+la réponse HTTP :
+
+- un job avec `skipReason` (membre sans identité utilisable) → `failed` explicite ;
+- sinon, le **dispatcher** du type de canal rend le template et envoie ;
+- l'exécution passe à `sent` (avec `sent_at`) ou `failed` (avec `error_message`).
+
+## Pourquoi ce découpage
+
+| Choix | Raison |
+|---|---|
+| Réponse avant envoi | SMTP/Discord sont lents ; ne pas faire expirer le `fetch` appelant (mesuré ~1 s vs plusieurs s). |
+| Résolution sans envoi (étape 4) | Rendre la notif **rattachable** au compte du membre même si rien n'est livré. |
+| Échec explicite si pas de destinataire | Forcer l'app à corriger plutôt que livrer au mauvais endroit. |
+| Exécution = source de vérité | Le statut final vit dans `workflow_executions`, pas dans la réponse HTTP. |

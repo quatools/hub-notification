@@ -103,6 +103,7 @@ ne sont pas concernées.
 | Code | Cause |
 |---|---|
 | `401` | Clé API invalide ou manquante. |
-| `400` | `event`, `org_id` ou `payload` manquant/invalide. |
+| `400` | `event`, `org_id` ou `payload` manquant/invalide ; `recipients`/`target_users` non-tableau ou > 500. |
+| `403` | App en essai au plafond atteint, bloquée par l'opérateur, ou événement hors du périmètre de la clé. |
 | `404` | Événement inconnu, inactif ou déprécié. |
 | `500` | Erreur interne. |

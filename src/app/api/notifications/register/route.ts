@@ -18,10 +18,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Body JSON invalide' }, { status: 400 })
   }
 
-  // 3. Validation
-  if (!body.app || typeof body.app !== 'string') {
-    return NextResponse.json({ error: 'Champ "app" requis (string)' }, { status: 400 })
-  }
+  // 3. Validation. `app` n'est PAS requis : l'app de référence est déduite de la
+  // clé API (cf. §Sécurité plus bas), jamais du body. Un éventuel `body.app` est
+  // ignoré (rétrocompat) — c'est cohérent avec /orgs et /emit.
   if (!Array.isArray(body.events) || body.events.length === 0) {
     return NextResponse.json({ error: 'Champ "events" requis (array non vide)' }, { status: 400 })
   }

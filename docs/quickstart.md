@@ -61,7 +61,6 @@ Content-Type: application/json
 
 ```json
 {
-  "app": "baas-esport",
   "events": [
     {
       "slug": "baas.subscription.created",
