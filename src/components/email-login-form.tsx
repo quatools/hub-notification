@@ -191,8 +191,12 @@ export function EmailLoginForm({ next = "/admin" }: { next?: string }) {
       ) : (
         <form onSubmit={handleVerifyCode} className="space-y-3">
           <p className="text-sm text-center text-muted-foreground">
-            Un email vient d&apos;être envoyé à <strong>{email}</strong>. Saisissez le code reçu, ou
-            cliquez directement sur le lien de l&apos;email.
+            Un email vient d&apos;être envoyé à <strong>{email}</strong>. Saisissez ci-dessous le code
+            reçu (recommandé).
+          </p>
+          <p className="text-xs text-center text-muted-foreground">
+            Le lien de l&apos;email fonctionne aussi, mais uniquement s&apos;il est ouvert dans ce même
+            navigateur. Sur un autre appareil, utilisez le code.
           </p>
           <Input
             inputMode="numeric"

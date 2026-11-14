@@ -38,7 +38,12 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (error) {
-      return NextResponse.redirect(new URL('/login?error=auth_failed', request.url))
+      // On conserve la destination pour que l'utilisateur puisse réessayer
+      // (ex : lien magique ouvert dans un autre navigateur → code à 6 chiffres).
+      const failUrl = new URL('/login', request.url)
+      failUrl.searchParams.set('error', 'auth_failed')
+      failUrl.searchParams.set('next', next)
+      return NextResponse.redirect(failUrl)
     }
 
     // HTML redirect to ensure cookies propagate
