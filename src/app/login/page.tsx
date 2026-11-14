@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { safeInternalPath } from "@/lib/safe-next"
+import { EmailLoginForm } from "@/components/email-login-form"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2, SlidersHorizontal, BellOff, Forward, ShieldCheck } from "lucide-react"
@@ -113,11 +114,25 @@ function LegalConsent() {
   )
 }
 
+/** Échec du callback (lien magique expiré / ouvert ailleurs, ou OAuth interrompu). */
+function AuthFailedNotice() {
+  return (
+    <p
+      role="alert"
+      className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-center text-destructive"
+    >
+      La connexion n&apos;a pas abouti. Si vous avez cliqué sur un lien reçu par email, il a pu expirer
+      ou être ouvert dans un autre navigateur : demandez un nouveau code ci-dessous et saisissez-le ici.
+    </p>
+  )
+}
+
 function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const next = safeNext(searchParams.get("next"))
   const { isMemberLink, name } = useMemo(() => decodeLinkInfo(next), [next])
+  const authFailed = searchParams.get("error") === "auth_failed"
   const [loading, setLoading] = useState<Provider | null>(null)
   const supabase = createClient()
 
@@ -174,7 +189,9 @@ function LoginContent() {
               </li>
             </ul>
 
+            {authFailed && <AuthFailedNotice />}
             <ProviderButtons onLogin={handleLogin} loading={loading} />
+            <EmailLoginForm next={next} />
 
             <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
               <ShieldCheck className="h-3.5 w-3.5" />
@@ -202,7 +219,9 @@ function LoginContent() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {authFailed && <AuthFailedNotice />}
           <ProviderButtons onLogin={handleLogin} loading={loading} />
+          <EmailLoginForm next={next} />
           <LegalConsent />
         </CardContent>
       </Card>
