@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useClub } from "@/lib/contexts/club-context"
 import { createClient } from "@/lib/supabase/client"
 import { DiscordLoginButton } from "@/components/discord-login-button"
+import { EmailLoginForm } from "@/components/email-login-form"
 import { toast } from "sonner"
 import Link from "next/link"
 import { Bell, Mail, Palette, Sparkles, Users, ShieldCheck, AlertCircle } from "lucide-react"
@@ -34,6 +35,7 @@ export default function AdminDashboardPage() {
   const orgParam = typeof window !== "undefined"
     ? new URLSearchParams(window.location.search).get("org")
     : null
+  const adminNext = orgParam ? `/admin?org=${encodeURIComponent(orgParam)}` : "/admin"
   const dateLabel = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })
 
   const [data, setData] = useState<DashboardData | null>(null)
@@ -47,7 +49,8 @@ export default function AdminDashboardPage() {
       if (!u) return
       const m = (u.user_metadata || {}) as Record<string, string>
       const full = m.full_name || m.name || u.email || ""
-      setAdminName(full.split(" ")[0] || full.split("@")[0] || null)
+      // Compte email sans nom (connexion par email) : partie locale de l'adresse
+      setAdminName((full.includes("@") ? full.split("@")[0] : full.split(" ")[0]) || null)
     })
   }, [])
 
@@ -116,7 +119,14 @@ export default function AdminDashboardPage() {
               </li>
             </ul>
 
-            <DiscordLoginButton next={orgParam ? `/admin?org=${orgParam}` : "/admin"} className="w-full" />
+            <DiscordLoginButton next={adminNext} className="w-full" />
+            <EmailLoginForm next={adminNext} />
+            <p className="text-center text-xs text-muted-foreground">
+              Google ou GitHub ?{" "}
+              <Link href={`/login?next=${encodeURIComponent(adminNext)}`} className="underline hover:text-foreground">
+                Toutes les méthodes de connexion
+              </Link>
+            </p>
 
             <p className="flex items-start justify-center gap-1.5 text-xs text-muted-foreground text-center">
               <ShieldCheck className="h-3.5 w-3.5 mt-0.5 shrink-0" />

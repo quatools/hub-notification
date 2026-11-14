@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { safeInternalPath } from "@/lib/safe-next"
+import { EmailLoginForm } from "@/components/email-login-form"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2, SlidersHorizontal, BellOff, Forward, ShieldCheck } from "lucide-react"
@@ -175,6 +176,7 @@ function LoginContent() {
             </ul>
 
             <ProviderButtons onLogin={handleLogin} loading={loading} />
+            <EmailLoginForm next={next} />
 
             <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
               <ShieldCheck className="h-3.5 w-3.5" />
@@ -203,6 +205,7 @@ function LoginContent() {
         </CardHeader>
         <CardContent className="space-y-4">
           <ProviderButtons onLogin={handleLogin} loading={loading} />
+          <EmailLoginForm next={next} />
           <LegalConsent />
         </CardContent>
       </Card>
